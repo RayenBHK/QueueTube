@@ -1,0 +1,10 @@
+# Local development tools and installer artifacts
+.tools/
+gh_*.msi
+gh_*.zip
+gh-install.log
+
+# Generated test and OS files
+coverage/
+.DS_Store
+Thumbs.db

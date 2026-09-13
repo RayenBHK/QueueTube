@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>QueueTube</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="masthead">
+        <div class="brand-mark" aria-hidden="true">
+          <span></span><span></span>
+        </div>
+        <div>
+          <p class="eyebrow">YOUR WATCHING CONTROL DESK</p>
+          <h1>Queue<span>Tube</span></h1>
+        </div>
+        <div class="total" aria-label="Total queued">
+          <strong id="total-count">0</strong>
+          <span>queued</span>
+        </div>
+      </header>
+
+      <section class="lanes" aria-label="Video queues">
+        <article class="lane lane-short">
+          <div class="lane-rail" aria-hidden="true"><i></i></div>
+          <div class="lane-copy">
+            <p class="lane-status">READY · PAUSED</p>
+            <h2>Shorts</h2>
+            <p>Loaded for a quick run.</p>
+          </div>
+          <strong class="lane-count" id="short-count">0</strong>
+          <button class="lane-action" data-open="short" type="button">Open next <span>→</span></button>
+        </article>
+
+        <article class="lane lane-video">
+          <div class="lane-rail" aria-hidden="true"><i></i></div>
+          <div class="lane-copy">
+            <p class="lane-status">MEMORY · RELEASED</p>
+            <h2>Videos</h2>
+            <p id="video-sleep-copy">Sleeping until selected.</p>
+          </div>
+          <strong class="lane-count" id="video-count">0</strong>
+          <button class="lane-action" data-open="video" type="button">Open next <span>→</span></button>
+        </article>
+      </section>
+
+      <div class="queue-tools">
+        <button id="sleep-videos" class="quiet-button" type="button">Put videos to sleep</button>
+        <button id="clear-queues" class="text-button" type="button">Clear both lanes</button>
+      </div>
+
+      <details class="settings">
+        <summary>
+          <span>How queuing works</span>
+          <span class="summary-hint">SETTINGS</span>
+        </summary>
+        <div class="setting-list">
+          <label>
+            <span><b>Catch Ctrl / ⌘-click</b><small>Your normal collecting gesture</small></span>
+            <input type="checkbox" data-setting="captureCtrlClick">
+          </label>
+          <label>
+            <span><b>Catch middle-click</b><small>Send wheel-clicks to the lanes too</small></span>
+            <input type="checkbox" data-setting="captureMiddleClick">
+          </label>
+          <label>
+            <span><b>Shorts in regular player</b><small>No vertical Shorts feed</small></span>
+            <input type="checkbox" data-setting="shortsInPlayer">
+          </label>
+          <label>
+            <span><b>Manual play only</b><small>Queued and background tabs stay paused</small></span>
+            <input type="checkbox" data-setting="pauseBackground">
+          </label>
+          <label>
+            <span><b>Sleep long videos</b><small>Reloads a video only when you select it</small></span>
+            <input type="checkbox" data-setting="sleepVideos">
+          </label>
+          <label>
+            <span><b>Block duplicates</b><small>One tab per pick in each lane</small></span>
+            <input type="checkbox" data-setting="preventDuplicates">
+          </label>
+        </div>
+      </details>
+
+      <footer>
+        <p id="status" role="status" aria-live="polite">Ctrl-click a YouTube pick to begin.</p>
+        <p class="shortcuts"><kbd>Alt</kbd><b>+</b><kbd>Shift</kbd><b>+</b><kbd>S</kbd> next Short</p>
+      </footer>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
