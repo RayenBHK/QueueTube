@@ -9,84 +9,34 @@
   <body>
     <main class="shell">
       <header class="masthead">
-        <div class="brand-mark" aria-hidden="true">
-          <span></span><span></span>
-        </div>
-        <div>
-          <p class="eyebrow">YOUR WATCHING CONTROL DESK</p>
-          <h1>Queue<span>Tube</span></h1>
-        </div>
-        <div class="total" aria-label="Total queued">
-          <strong id="total-count">0</strong>
-          <span>queued</span>
-        </div>
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span></div>
+        <div><p class="eyebrow">YOUR WATCHING CONTROL DESK</p><h1>Queue<span>Tube</span></h1></div>
+        <div class="total" aria-label="Total queued"><strong id="total-count">0</strong><span>queued</span></div>
       </header>
+
+      <button class="room-button" id="open-room" type="button">
+        <span><small>OPEN THE</small><strong>Queue Room</strong></span>
+        <span class="room-arrow" aria-hidden="true">→</span>
+      </button>
 
       <section class="lanes" aria-label="Video queues">
         <article class="lane lane-short">
-          <div class="lane-rail" aria-hidden="true"><i></i></div>
-          <div class="lane-copy">
-            <p class="lane-status">READY · PAUSED</p>
-            <h2>Shorts</h2>
-            <p>Loaded for a quick run.</p>
-          </div>
+          <span class="lane-dot" aria-hidden="true"></span>
+          <div><p class="lane-status">QUICK RUN</p><h2>Shorts</h2><small>One player · manual play</small></div>
           <strong class="lane-count" id="short-count">0</strong>
-          <button class="lane-action" data-open="short" type="button">Open next <span>→</span></button>
+          <button data-open="short" type="button">Play <span aria-hidden="true">▶</span></button>
         </article>
-
         <article class="lane lane-video">
-          <div class="lane-rail" aria-hidden="true"><i></i></div>
-          <div class="lane-copy">
-            <p class="lane-status">MEMORY · RELEASED</p>
-            <h2>Videos</h2>
-            <p id="video-sleep-copy">Sleeping until selected.</p>
-          </div>
+          <span class="lane-dot" aria-hidden="true"></span>
+          <div><p class="lane-status">ZERO MEMORY</p><h2>Videos</h2><small>No page until selected</small></div>
           <strong class="lane-count" id="video-count">0</strong>
-          <button class="lane-action" data-open="video" type="button">Open next <span>→</span></button>
+          <button data-open="video" type="button">Play <span aria-hidden="true">▶</span></button>
         </article>
       </section>
 
-      <div class="queue-tools">
-        <button id="sleep-videos" class="quiet-button" type="button">Put videos to sleep</button>
-        <button id="clear-queues" class="text-button" type="button">Clear both lanes</button>
-      </div>
-
-      <details class="settings">
-        <summary>
-          <span>How queuing works</span>
-          <span class="summary-hint">SETTINGS</span>
-        </summary>
-        <div class="setting-list">
-          <label>
-            <span><b>Catch Ctrl / ⌘-click</b><small>Your normal collecting gesture</small></span>
-            <input type="checkbox" data-setting="captureCtrlClick">
-          </label>
-          <label>
-            <span><b>Catch middle-click</b><small>Send wheel-clicks to the lanes too</small></span>
-            <input type="checkbox" data-setting="captureMiddleClick">
-          </label>
-          <label>
-            <span><b>Shorts in regular player</b><small>No vertical Shorts feed</small></span>
-            <input type="checkbox" data-setting="shortsInPlayer">
-          </label>
-          <label>
-            <span><b>Manual play only</b><small>Queued and background tabs stay paused</small></span>
-            <input type="checkbox" data-setting="pauseBackground">
-          </label>
-          <label>
-            <span><b>Sleep long videos</b><small>Reloads a video only when you select it</small></span>
-            <input type="checkbox" data-setting="sleepVideos">
-          </label>
-          <label>
-            <span><b>Block duplicates</b><small>One tab per pick in each lane</small></span>
-            <input type="checkbox" data-setting="preventDuplicates">
-          </label>
-        </div>
-      </details>
-
       <footer>
         <p id="status" role="status" aria-live="polite">Ctrl-click a YouTube pick to begin.</p>
-        <p class="shortcuts"><kbd>Alt</kbd><b>+</b><kbd>Shift</kbd><b>+</b><kbd>S</kbd> next Short</p>
+        <p><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>Q</kbd></p>
       </footer>
     </main>
     <script src="popup.js"></script>

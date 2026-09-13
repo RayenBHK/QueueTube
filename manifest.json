@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
   "name": "QueueTube",
-  "version": "0.1.0",
-  "description": "Sort YouTube picks into ready Shorts and sleeping video queues.",
-  "minimum_chrome_version": "102",
+  "version": "0.2.0",
+  "description": "Save YouTube picks into focused Shorts and video queues without opening memory-heavy tabs.",
+  "minimum_chrome_version": "116",
   "permissions": [
     "storage",
     "tabs",
-    "tabGroups"
+    "tabGroups",
+    "sidePanel"
   ],
   "host_permissions": [
     "https://www.youtube.com/*",
@@ -26,6 +27,9 @@
       "32": "assets/icon32.png"
     }
   },
+  "side_panel": {
+    "default_path": "src/sidepanel/sidepanel.html"
+  },
   "icons": {
     "16": "assets/icon16.png",
     "32": "assets/icon32.png",
@@ -42,10 +46,19 @@
       "js": [
         "src/content.js"
       ],
+      "css": [
+        "src/content.css"
+      ],
       "run_at": "document_start"
     }
   ],
   "commands": {
+    "open-queue-room": {
+      "suggested_key": {
+        "default": "Alt+Shift+Q"
+      },
+      "description": "Open the QueueTube Queue Room"
+    },
     "open-next-short": {
       "suggested_key": {
         "default": "Alt+Shift+S"
@@ -57,6 +70,12 @@
         "default": "Alt+Shift+V"
       },
       "description": "Open the next queued video"
+    },
+    "skip-current": {
+      "suggested_key": {
+        "default": "Alt+Shift+X"
+      },
+      "description": "Skip the current QueueTube pick"
     }
   }
 }

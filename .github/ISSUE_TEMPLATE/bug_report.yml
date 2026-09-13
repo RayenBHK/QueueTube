@@ -1,0 +1,49 @@
+name: Bug report
+description: Report behavior that prevents QueueTube from working as documented.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping improve QueueTube. Remove private account details from screenshots and logs.
+  - type: input
+    id: chrome-version
+    attributes:
+      label: Chrome version
+      placeholder: 153.0.8010.36
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Collecting mode
+      options:
+        - Queue Room
+        - Classic tabs
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the smallest sequence that shows the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Relevant diagnostics
+      description: Add console errors or screenshots after removing private account details.
+      render: shell
