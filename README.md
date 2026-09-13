@@ -1,43 +1,96 @@
-# QueueTube
+<!-- meta.contentType: Landing -->
+<!-- content plan: docs/plans/documentation-plan.md -->
 
-QueueTube turns the way you already collect YouTube videos into two deliberate queues:
+# Queue YouTube picks without opening more tabs
 
-- **Shorts** are opened, loaded, and held paused in an orange tab group so they are ready for a quick viewing run.
-- **Videos** are opened in a blue tab group and immediately discarded from memory. Chrome reloads one only when you select it.
+QueueTube turns Ctrl-click into a deliberate YouTube queue. Shorts and long videos stay organized as lightweight local records, then play in one reusable tab only when you choose them.
 
-Ctrl-click or middle-click any video on YouTube. QueueTube catches the gesture, identifies the format, and places the tab in the correct lane while preserving the order in which you picked it.
+![QueueTube Queue Room](store-assets/screenshot-queue-room-1280x800.png)
+
+## What QueueTube changes
+
+QueueTube keeps your existing collection gesture and removes the expensive part: every selected video no longer needs its own YouTube page.
+
+- **Queue Room**: separates Shorts from long videos in a persistent side panel
+- **One-tab player**: reuses one YouTube tab across the queue
+- **Manual playback**: keeps queued and background media paused until you press play
+- **Zero-memory videos**: stores long videos as links until you select one
+- **Focused Shorts run**: converts Shorts to the regular player and loads the next pick without playing it
+- **Focus Shield**: hides related videos, comments, merchandise, and end cards on player pages
+- **Time budgets**: starts a 10, 20, or 30 minute viewing session
+- **Local history**: records watched and skipped picks on your device
+- **Classic tabs**: preserves the original grouped-tab workflow as an optional mode
+
+QueueTube has no server, account, analytics, ads, or external JavaScript.
 
 ## Install the local build
 
-1. Open `chrome://extensions` in Chrome.
-2. Turn on **Developer mode**.
-3. Choose **Load unpacked**.
-4. Select this `Extension_Project` folder.
-5. Refresh any YouTube page that was already open.
+Use an unpacked extension while QueueTube is in development:
 
-The QueueTube button shows the total number of queued tabs. Its popup lets you open the next Short or video, sleep all inactive long videos again, clear the queues, and change the capture and playback settings.
+1. Download or clone this repository
+2. Open `chrome://extensions` in Chrome
+3. Turn on **Developer mode**
+4. Click **Load unpacked**
+5. Select the repository folder
+6. Refresh any YouTube tab that was already open
 
-## Default behavior
+Chrome 116 or newer is required.
 
-- Ctrl / Command-click and middle-click are captured on YouTube video, live, and Shorts links.
-- Shorts use YouTube's regular `/watch` player instead of the vertical Shorts feed.
-- Nothing in a queued or hidden YouTube tab plays until you interact with its player.
-- Long videos are marked auto-discardable and discarded while inactive.
-- Playlist parameters are removed so one queued pick cannot roll into a playlist.
-- Duplicate picks in the same lane are ignored.
+## Collect and watch picks
 
-Keyboard shortcuts: `Alt+Shift+S` opens the next Short and `Alt+Shift+V` opens the next long video. Chrome can change these at `chrome://extensions/shortcuts`.
+Queue Room mode is enabled by default:
 
-## Privacy
+1. Browse YouTube Home or Subscriptions
+2. Ctrl-click, Command-click, or middle-click a video or Short
+3. Click the QueueTube toolbar button
+4. Click **Queue Room**
+5. Choose a pick, then press play in YouTube
 
-QueueTube has no server, analytics, account, or external dependencies. It only reads YouTube links you click and Chrome's tabs, groups, and local extension settings.
+QueueTube marks queued thumbnails on YouTube. It also blocks duplicate picks by default.
 
-## Verify the project
+Inside a QueueTube player page, use these keys:
 
-With Node.js installed, run:
+- `N`: load the next pick without recording an outcome
+- `P`: restore and open the latest history item
+- `X`: skip the current pick and load the next one
 
-```text
-node --test
+Chrome-wide shortcuts are available at `chrome://extensions/shortcuts`:
+
+- `Alt+Shift+Q`: open the Queue Room
+- `Alt+Shift+S`: open the next Short
+- `Alt+Shift+V`: open the next long video
+- `Alt+Shift+X`: skip the current pick
+
+## Gather existing YouTube tabs
+
+Open **Queue tools**, then click **Import open tabs**. You can keep the original tabs or close only the tabs that QueueTube imports.
+
+## Use Classic tabs
+
+Open **Controls & protection**, then change **Collecting mode** to **Classic tabs**. Shorts open in an orange tab group. Long videos open in a collapsed blue group and become discardable while inactive.
+
+## Develop and verify QueueTube
+
+QueueTube uses browser-native JavaScript and has no runtime dependencies. Run the release checks with Node.js 22 or newer:
+
+```powershell
+node tools/check-extension.mjs
 ```
 
-The automated checks cover URL classification, Shorts conversion, playlist isolation, duplicate keys, and the manifest's local entry points.
+Build the Chrome Web Store ZIP on Windows:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/package-extension.ps1
+```
+
+Read [how to test QueueTube](docs/TESTING.md), [how QueueTube works](ARCHITECTURE.md), [QueueTube's accessibility support](docs/ACCESSIBILITY.md), and [how to contribute](CONTRIBUTING.md).
+
+## Privacy and support
+
+Queue data, settings, session budgets, and QueueTube history stay in local Chrome extension storage. Read the [privacy policy](PRIVACY.md) and report defects through [GitHub Issues](https://github.com/RayenBHK/QueueTube/issues).
+
+QueueTube is an independent project. It is not affiliated with or endorsed by YouTube or Google.
+
+## License
+
+QueueTube is available under the [MIT License](LICENSE).

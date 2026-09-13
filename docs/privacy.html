@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>QueueTube privacy policy</title>
+    <meta name="description" content="QueueTube stores queue data locally and does not transmit it to the developer or third parties.">
+    <style>
+      :root { color-scheme: light; --paper: #f3f6f5; --ink: #102321; --muted: #526865; --line: #c4d0cd; --short: #cf4719; --video: #3b5ccc; }
+      * { box-sizing: border-box; }
+      body { margin: 0; color: var(--ink); background: linear-gradient(90deg, transparent 35px, rgba(59,92,204,.08) 36px, transparent 37px), var(--paper); font: 16px/1.65 system-ui, sans-serif; }
+      main { width: min(720px, calc(100% - 40px)); margin: 0 auto; padding: 64px 0 80px; }
+      .mark { display: flex; gap: 7px; height: 44px; margin-bottom: 28px; }.mark span { width: 10px; border-radius: 7px; }.mark span:first-child { height: 28px; margin-top: 16px; background: var(--short); }.mark span:last-child { background: var(--video); }
+      h1, h2 { font-family: "Arial Narrow", system-ui, sans-serif; letter-spacing: -.025em; }h1 { max-width: 620px; margin: 0 0 12px; font-size: clamp(38px, 7vw, 62px); line-height: .98; }h2 { margin: 38px 0 8px; font-size: 23px; }
+      .lede { max-width: 610px; color: var(--muted); font-size: 19px; }.date { padding-bottom: 24px; border-bottom: 1px solid var(--line); color: var(--muted); font: 700 12px/1.4 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
+      p { margin: 0 0 14px; }a { color: var(--video); text-underline-offset: 3px; }a:focus-visible { outline: 3px solid var(--short); outline-offset: 3px; }
+      footer { margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="mark" aria-hidden="true"><span></span><span></span></div>
+      <h1>QueueTube privacy policy</h1>
+      <p class="lede">QueueTube stores your queue and preferences on your device. It has no QueueTube server, account system, analytics, advertising, or data sale.</p>
+      <p class="date">Last updated: September 13, 2026</p>
+
+      <h2>Data QueueTube handles</h2>
+      <p>QueueTube reads the YouTube link and visible card metadata for videos you deliberately queue. That metadata can include the video's identifier, title, channel name, thumbnail URL, duration, and collection time.</p>
+      <p>QueueTube also stores your settings, viewing-session budget, current QueueTube player reference, and watched or skipped history.</p>
+
+      <h2>How QueueTube stores data</h2>
+      <p>Queue items, history, and settings stay in Chrome's local extension storage on your device. Session budgets and the current player reference remain until Chrome closes.</p>
+      <p>QueueTube does not use synchronized storage. It does not send stored data to the QueueTube developer or any third party.</p>
+
+      <h2>Requests to YouTube</h2>
+      <p>YouTube receives the normal network requests needed to show YouTube pages and video thumbnails. When you select a queued item, the browser opens its YouTube playback URL.</p>
+      <p>QueueTube does not add analytics identifiers or send a copy of your queue with those requests. YouTube's own data practices apply to YouTube pages and media.</p>
+
+      <h2>Data sharing and sale</h2>
+      <p>QueueTube does not sell, rent, share, or use your data for advertising, credit decisions, or purposes unrelated to organizing your YouTube picks.</p>
+
+      <h2>Retention and deletion</h2>
+      <p>QueueTube keeps local queue and history records until you remove them, clear them in the Queue Room, clear the extension's site data, or uninstall the extension.</p>
+      <p>Use <strong>Clear queue</strong> to delete waiting picks. Open <strong>History</strong>, then use <strong>Clear history</strong> to delete watched and skipped records.</p>
+
+      <h2>Policy changes</h2>
+      <p>Future releases will update this policy before changing QueueTube's data practices. The repository's version history records policy changes.</p>
+
+      <h2>Contact</h2>
+      <p>Open a privacy question through <a href="https://github.com/RayenBHK/QueueTube/issues">QueueTube's GitHub Issues</a>.</p>
+      <footer>QueueTube is an independent project. It is not affiliated with or endorsed by YouTube or Google.</footer>
+    </main>
+  </body>
+</html>

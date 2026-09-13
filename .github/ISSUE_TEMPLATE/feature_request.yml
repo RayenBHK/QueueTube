@@ -1,0 +1,31 @@
+name: Feature request
+description: Suggest an improvement to QueueTube's deliberate-watching workflow.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: frustration
+    attributes:
+      label: Repetitive frustration
+      description: What keeps interrupting or slowing down your YouTube workflow?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe what you want to be able to do.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Current workaround
+      description: Explain how you handle this today, if applicable.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Product fit
+      options:
+        - label: This request supports deliberate watching and avoids adding a recommendation feed.
+          required: true
