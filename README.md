@@ -83,7 +83,7 @@ Build the Chrome Web Store ZIP on Windows:
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/package-extension.ps1
 ```
 
-Read [how to test QueueTube](docs/TESTING.md), [how QueueTube works](ARCHITECTURE.md), [QueueTube's accessibility support](docs/ACCESSIBILITY.md), and [how to contribute](CONTRIBUTING.md).
+Read [the v0.3.0 roadmap](docs/ROADMAP-v0.3.md), [how to test QueueTube](docs/TESTING.md), [how QueueTube works](ARCHITECTURE.md), [QueueTube's accessibility support](docs/ACCESSIBILITY.md), and [how to contribute](CONTRIBUTING.md).
 
 ## Privacy and support
 
