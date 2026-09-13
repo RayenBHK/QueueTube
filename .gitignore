@@ -6,5 +6,11 @@ gh-install.log
 
 # Generated test and OS files
 coverage/
+dist/
+.artifacts/
+.chrome-test-profile/
+.chrome-cft-profile/
+.chrome-store-render/
+.chrome-promo-render/
 .DS_Store
 Thumbs.db

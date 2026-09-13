@@ -1,91 +1,67 @@
-const settingInputs = [...document.querySelectorAll("[data-setting]")];
-const openButtons = [...document.querySelectorAll("[data-open]")];
 const totalCount = document.getElementById("total-count");
 const shortCount = document.getElementById("short-count");
 const videoCount = document.getElementById("video-count");
-const videoSleepCopy = document.getElementById("video-sleep-copy");
 const status = document.getElementById("status");
-const sleepButton = document.getElementById("sleep-videos");
-const clearButton = document.getElementById("clear-queues");
-
-let windowId;
+const openButtons = [...document.querySelectorAll("[data-open]")];
+let windowId = null;
+let state = null;
 
 function setStatus(message) {
   status.textContent = message;
 }
 
-async function send(message) {
-  return chrome.runtime.sendMessage({ ...message, windowId });
-}
-
-function render(state) {
-  const shorts = state.queues.short;
-  const videos = state.queues.video;
-  totalCount.textContent = shorts.count + videos.count;
-  shortCount.textContent = shorts.count;
-  videoCount.textContent = videos.count;
-  videoSleepCopy.textContent = videos.count
-    ? `${videos.sleeping} of ${videos.count} sleeping.`
-    : "Sleeping until selected.";
-
+function render() {
+  const useClassic = state.settings.captureMode === "classic-tabs";
+  const queues = useClassic ? state.classicQueues : state.queues;
+  const total = queues.short.count + queues.video.count;
+  totalCount.textContent = String(total);
+  shortCount.textContent = String(queues.short.count);
+  videoCount.textContent = String(queues.video.count);
   openButtons.forEach((button) => {
-    button.disabled = state.queues[button.dataset.open].count === 0;
+    button.disabled = queues[button.dataset.open].count === 0;
   });
-  sleepButton.disabled = videos.count === 0;
-  clearButton.disabled = shorts.count + videos.count === 0;
-
-  settingInputs.forEach((input) => {
-    input.checked = Boolean(state.settings[input.dataset.setting]);
-  });
-
-  if (shorts.count + videos.count === 0) {
-    setStatus("Lanes clear. Ctrl-click a YouTube pick to begin.");
-  } else {
-    setStatus(`${shorts.count} ready now · ${videos.sleeping} long video${videos.sleeping === 1 ? "" : "s"} asleep.`);
-  }
+  if (!total) setStatus(useClassic ? "Classic tab lanes are clear." : "Queue clear. Ctrl-click a YouTube pick.");
+  else setStatus(useClassic ? "Classic grouped-tab mode is active." : `${queues.short.count} Shorts ready · ${queues.video.count} videos sleeping as links.`);
 }
 
 async function refresh() {
   try {
-    const state = await send({ type: "GET_POPUP_STATE" });
-    if (!state?.queues) throw new Error("state unavailable");
-    render(state);
+    state = await chrome.runtime.sendMessage({ type: "GET_APP_STATE", windowId });
+    if (!state?.ok) throw new Error("state unavailable");
+    render();
   } catch {
     setStatus("Couldn’t read the queue. Reload the extension once.");
   }
 }
 
+document.getElementById("open-room").addEventListener("click", async () => {
+  try {
+    const opening = chrome.sidePanel.open({ windowId });
+    await opening;
+    window.close();
+  } catch {
+    setStatus("Couldn’t open the Queue Room in this window.");
+  }
+});
+
 openButtons.forEach((button) => {
   button.addEventListener("click", async () => {
-    const result = await send({ type: "OPEN_NEXT", kind: button.dataset.open });
-    if (result?.ok) window.close();
-    else setStatus(result?.reason === "end-of-queue" ? "You’re already on the last item in that lane." : "That lane is empty.");
+    try {
+      const result = await chrome.runtime.sendMessage({ type: "OPEN_NEXT", kind: button.dataset.open, windowId });
+      if (result?.ok) window.close();
+      else setStatus(result?.reason === "budget-finished" ? "Your time budget is complete." : "That lane is empty.");
+    } catch {
+      setStatus("QueueTube lost its browser connection. Reload once.");
+    }
   });
 });
 
-sleepButton.addEventListener("click", async () => {
-  const result = await send({ type: "SLEEP_VIDEOS" });
-  setStatus(result?.slept ? `${result.slept} video tab${result.slept === 1 ? "" : "s"} put to sleep.` : "All inactive videos are already sleeping.");
-  await refresh();
-});
-
-clearButton.addEventListener("click", async () => {
-  if (!window.confirm("Close every tab in both QueueTube lanes?")) return;
-  const result = await send({ type: "CLEAR_QUEUES" });
-  await refresh();
-  setStatus(`${result?.removed || 0} queued tab${result?.removed === 1 ? "" : "s"} closed.`);
-});
-
-settingInputs.forEach((input) => {
-  input.addEventListener("change", async () => {
-    await chrome.storage.local.set({ [input.dataset.setting]: input.checked });
-    await send({ type: "SETTINGS_UPDATED" });
+void (async () => {
+  try {
+    const currentWindow = await chrome.windows.getCurrent();
+    windowId = currentWindow.id;
     await refresh();
-    setStatus("Setting saved.");
-  });
-});
-
-chrome.windows.getCurrent().then((currentWindow) => {
-  windowId = currentWindow.id;
-  refresh();
-});
+  } catch {
+    setStatus("QueueTube couldn’t initialize. Reload the extension once.");
+  }
+})();

@@ -1,0 +1,46 @@
+.queuetube-focus-shield #secondary,
+.queuetube-focus-shield ytd-watch-next-secondary-results-renderer,
+.queuetube-focus-shield ytd-comments,
+.queuetube-focus-shield #comments,
+.queuetube-focus-shield .ytp-endscreen-content,
+.queuetube-focus-shield .ytp-ce-element,
+.queuetube-focus-shield ytd-merch-shelf-renderer {
+  display: none !important;
+}
+
+.queuetube-focus-shield ytd-watch-flexy[flexy] #primary.ytd-watch-flexy {
+  max-width: 1120px !important;
+}
+
+[data-queuetube-queued="short"],
+[data-queuetube-queued="video"] {
+  position: relative !important;
+}
+
+[data-queuetube-queued="short"]::after,
+[data-queuetube-queued="video"]::after {
+  content: "QUEUED";
+  position: absolute;
+  z-index: 5;
+  top: 8px;
+  left: 8px;
+  padding: 4px 7px;
+  border: 1px solid rgba(255, 255, 255, .72);
+  border-radius: 999px;
+  color: #fff;
+  background: #3b5ccc;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .28);
+  font: 700 10px/1 "Roboto", "Arial", sans-serif;
+  letter-spacing: .08em;
+  pointer-events: none;
+}
+
+[data-queuetube-queued="short"]::after {
+  background: #cf4719;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #queuetube-toast-root * {
+    transition-duration: .001ms !important;
+  }
+}

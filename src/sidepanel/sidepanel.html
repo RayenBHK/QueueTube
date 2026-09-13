@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>QueueTube Queue Room</title>
+    <link rel="stylesheet" href="sidepanel.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="masthead">
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span></div>
+        <div class="brand-copy">
+          <p class="eyebrow">YOUR WATCHING CONTROL DESK</p>
+          <h1>Queue<span>Tube</span></h1>
+        </div>
+        <div class="queue-total" aria-label="Total items queued">
+          <strong id="total-count">0</strong>
+          <span>queued</span>
+        </div>
+      </header>
+
+      <section class="session-bar" aria-labelledby="session-heading">
+        <div>
+          <p class="eyebrow" id="session-heading">THIS SESSION</p>
+          <strong id="budget-copy">No time limit</strong>
+        </div>
+        <div class="budget-options" aria-label="Session time budget">
+          <button type="button" data-budget="10">10m</button>
+          <button type="button" data-budget="20">20m</button>
+          <button type="button" data-budget="30">30m</button>
+          <button type="button" data-budget="0">∞</button>
+        </div>
+      </section>
+
+      <nav class="view-tabs" aria-label="QueueTube views" role="tablist">
+        <button id="queue-tab" type="button" role="tab" aria-selected="true" aria-controls="queue-view">Queue room</button>
+        <button id="history-tab" type="button" role="tab" aria-selected="false" aria-controls="history-view" tabindex="-1">History <span id="history-count">0</span></button>
+      </nav>
+
+      <section id="queue-view" role="tabpanel" aria-labelledby="queue-tab">
+        <section class="lane lane-short" aria-labelledby="short-heading">
+          <header class="lane-heading">
+            <div class="lane-rail" aria-hidden="true"><i></i></div>
+            <div>
+              <p class="lane-status">QUICK RUN · MANUAL PLAY</p>
+              <h2 id="short-heading">Shorts <span id="short-count">0</span></h2>
+            </div>
+            <button class="play-lane" type="button" data-open-lane="short">Play first <span aria-hidden="true">→</span></button>
+          </header>
+          <ol class="queue-list" id="short-list"></ol>
+          <div class="empty-state" id="short-empty">
+            <strong>The fast lane is clear.</strong>
+            <span>Ctrl-click a Short on YouTube to save it here.</span>
+          </div>
+        </section>
+
+        <section class="lane lane-video" aria-labelledby="video-heading">
+          <header class="lane-heading">
+            <div class="lane-rail" aria-hidden="true"><i></i></div>
+            <div>
+              <p class="lane-status">ZERO MEMORY · UNTIL PLAYED</p>
+              <h2 id="video-heading">Videos <span id="video-count">0</span></h2>
+            </div>
+            <button class="play-lane" type="button" data-open-lane="video">Play first <span aria-hidden="true">→</span></button>
+          </header>
+          <ol class="queue-list" id="video-list"></ol>
+          <div class="empty-state" id="video-empty">
+            <strong>No long videos waiting.</strong>
+            <span>Saved videos use no tab or page memory.</span>
+          </div>
+        </section>
+
+        <section class="toolbox" aria-labelledby="tools-heading">
+          <div class="toolbox-heading">
+            <div>
+              <p class="eyebrow">HOUSEKEEPING</p>
+              <h2 id="tools-heading">Queue tools</h2>
+            </div>
+            <button type="button" id="clear-queue" class="text-button">Clear queue</button>
+          </div>
+          <div class="tool-grid">
+            <button type="button" id="import-tabs" class="tool-card">
+              <span class="tool-icon" aria-hidden="true">↳</span>
+              <span><strong>Import open tabs</strong><small>Gather existing YouTube tabs</small></span>
+            </button>
+            <button type="button" id="copy-backup" class="tool-card">
+              <span class="tool-icon" aria-hidden="true">⧉</span>
+              <span><strong>Copy backup</strong><small>Queue and history as JSON</small></span>
+            </button>
+          </div>
+        </section>
+
+        <details class="settings-panel">
+          <summary><span>Controls &amp; protection</span><span class="summary-hint">SETTINGS</span></summary>
+          <div class="setting-list">
+            <label class="select-setting">
+              <span><b>Collecting mode</b><small>Queue Room saves links; Classic opens grouped tabs</small></span>
+              <select id="capture-mode" aria-label="Collecting mode">
+                <option value="queue-room">Queue Room</option>
+                <option value="classic-tabs">Classic tabs</option>
+              </select>
+            </label>
+            <label><span><b>Catch Ctrl / ⌘-click</b><small>Your normal collecting gesture</small></span><input type="checkbox" data-setting="captureCtrlClick"></label>
+            <label><span><b>Catch middle-click</b><small>Queue wheel-clicks too</small></span><input type="checkbox" data-setting="captureMiddleClick"></label>
+            <label><span><b>Manual play only</b><small>Queued and background media stay paused</small></span><input type="checkbox" data-setting="pauseBackground"></label>
+            <label><span><b>Focus Shield</b><small>Hide related videos, comments, and end cards</small></span><input type="checkbox" data-setting="focusShield"></label>
+            <label><span><b>Queue badges</b><small>Mark picks already waiting on YouTube</small></span><input type="checkbox" data-setting="showQueuedBadges"></label>
+            <label><span><b>Advance Shorts</b><small>Load the next Short, still paused</small></span><input type="checkbox" data-setting="autoAdvanceShorts"></label>
+            <label><span><b>Remove finished picks</b><small>Move watched and skipped items to history</small></span><input type="checkbox" data-setting="removeFinished"></label>
+            <label><span><b>Block duplicates</b><small>Keep each pick once</small></span><input type="checkbox" data-setting="preventDuplicates"></label>
+          </div>
+        </details>
+      </section>
+
+      <section id="history-view" role="tabpanel" aria-labelledby="history-tab" hidden>
+        <header class="history-heading">
+          <div><p class="eyebrow">LOCAL · PRIVATE</p><h2>Watch history</h2></div>
+          <button type="button" id="clear-history" class="text-button">Clear history</button>
+        </header>
+        <ol class="history-list" id="history-list"></ol>
+        <div class="empty-state history-empty" id="history-empty">
+          <strong>Nothing watched or skipped yet.</strong>
+          <span>Your local QueueTube history will appear here.</span>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <p id="status" role="status" aria-live="polite">Ready.</p>
+        <p class="shortcut-copy"><kbd>N</kbd> next · <kbd>P</kbd> previous · <kbd>X</kbd> skip</p>
+      </footer>
+    </main>
+
+    <dialog id="import-dialog" aria-labelledby="import-title">
+      <form method="dialog">
+        <p class="eyebrow">IMPORT TABS</p>
+        <h2 id="import-title">Gather open YouTube tabs?</h2>
+        <p>QueueTube will sort eligible tabs into the Queue Room. Only newly imported tabs can be closed.</p>
+        <label class="dialog-choice"><input type="checkbox" id="close-imported-tabs"><span><b>Close imported tabs</b><small>Free their memory after saving</small></span></label>
+        <div class="dialog-actions"><button value="cancel" class="quiet-button">Cancel</button><button value="confirm" class="primary-button">Import</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="clear-dialog" aria-labelledby="clear-title">
+      <form method="dialog">
+        <p class="eyebrow">CLEAR QUEUE</p>
+        <h2 id="clear-title">Remove every waiting pick?</h2>
+        <p>Your watch history stays intact.</p>
+        <div class="dialog-actions"><button value="cancel" class="quiet-button">Cancel</button><button value="confirm" class="danger-button">Clear queue</button></div>
+      </form>
+    </dialog>
+
+    <template id="queue-item-template">
+      <li class="queue-item" draggable="true">
+        <span class="drag-handle" aria-hidden="true">⋮⋮</span>
+        <button class="thumbnail-button" type="button" data-action="play">
+          <img alt="" loading="lazy" referrerpolicy="no-referrer">
+          <span class="duration"></span>
+          <span class="play-mark" aria-hidden="true">▶</span>
+        </button>
+        <div class="item-copy"><button class="item-title" type="button" data-action="play"></button><span class="item-channel"></span></div>
+        <div class="item-actions">
+          <button type="button" data-action="up" aria-label="Move up">↑</button>
+          <button type="button" data-action="down" aria-label="Move down">↓</button>
+          <button type="button" data-action="remove" aria-label="Remove">×</button>
+        </div>
+      </li>
+    </template>
+
+    <script src="sidepanel.js"></script>
+  </body>
+</html>
