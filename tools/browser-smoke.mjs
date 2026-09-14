@@ -1,9 +1,10 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const artifactDirectory = resolve(projectRoot, ".artifacts");
+const expectedManifest = JSON.parse(await readFile(resolve(projectRoot, "manifest.json"), "utf8"));
 const portArgument = process.argv.find((argument) => argument.startsWith("--port="));
 const extensionArgument = process.argv.find((argument) => argument.startsWith("--extension-id="));
 const port = Number(portArgument?.split("=")[1] || 9228);
@@ -23,12 +24,18 @@ async function sleep(milliseconds) {
 async function poll(operation, predicate, timeoutMs = 30_000) {
   const deadline = Date.now() + timeoutMs;
   let value;
+  let lastError;
   while (Date.now() < deadline) {
-    value = await operation();
-    if (predicate(value)) return value;
+    try {
+      value = await operation();
+      if (predicate(value)) return value;
+    } catch (error) {
+      lastError = error;
+    }
     await sleep(400);
   }
-  throw new Error(`Timed out with value: ${JSON.stringify(value)}`);
+  const detail = lastError?.message || JSON.stringify(value);
+  throw new Error(`Timed out with value: ${detail}`);
 }
 
 async function getTargets() {
@@ -43,7 +50,7 @@ async function createTarget(url) {
   return response.json();
 }
 
-async function connect(webSocketDebuggerUrl) {
+async function connect(webSocketDebuggerUrl, label) {
   const socket = new WebSocket(webSocketDebuggerUrl);
   await new Promise((resolveOpen, rejectOpen) => {
     socket.addEventListener("open", resolveOpen, { once: true });
@@ -63,7 +70,7 @@ async function connect(webSocketDebuggerUrl) {
     const request = pending.get(message.id);
     if (!request) return;
     pending.delete(message.id);
-    if (message.error) request.reject(new Error(message.error.message));
+    if (message.error) request.reject(new Error(`${label} ${request.method}: ${message.error.message}`));
     else request.resolve(message.result);
   });
 
@@ -72,7 +79,21 @@ async function connect(webSocketDebuggerUrl) {
       messageId += 1;
       const id = messageId;
       const response = new Promise((resolveMessage, rejectMessage) => {
-        pending.set(id, { resolve: resolveMessage, reject: rejectMessage });
+        const timeoutId = setTimeout(() => {
+          if (!pending.delete(id)) return;
+          rejectMessage(new Error(`Chrome DevTools did not answer ${label} ${method} within 20 seconds`));
+        }, 20_000);
+        pending.set(id, {
+          method,
+          resolve(value) {
+            clearTimeout(timeoutId);
+            resolveMessage(value);
+          },
+          reject(error) {
+            clearTimeout(timeoutId);
+            rejectMessage(error);
+          }
+        });
       });
       socket.send(JSON.stringify({ id, method, params }));
       return response;
@@ -97,38 +118,80 @@ async function evaluate(client, expression, userGesture = false) {
   return response.result.value;
 }
 
+function isQueueWorker(target) {
+  return target.type === "service_worker" && target.url.endsWith("/src/background.js");
+}
+
 let initialTargets = await getTargets();
-let queueWorker = initialTargets.find((target) => target.type === "service_worker" && target.url.endsWith("/background.js"));
+let queueWorker = initialTargets.find(isQueueWorker);
 let panelTarget = null;
 if (!queueWorker && extensionId) {
   panelTarget = await createTarget(`chrome-extension://${extensionId}/src/sidepanel/sidepanel.html`);
+  const wakeClient = await connect(panelTarget.webSocketDebuggerUrl, "Queue Room wake-up");
+  await wakeClient.send("Runtime.enable");
+  await evaluate(wakeClient, "chrome.runtime.sendMessage({ type: 'GET_APP_STATE' })");
+  wakeClient.close();
   queueWorker = await poll(
-    async () => (await getTargets()).find((target) => target.type === "service_worker" && target.url.endsWith("/background.js")),
+    async () => (await getTargets()).find(isQueueWorker),
     Boolean
   );
   initialTargets = await getTargets();
 }
 assert(queueWorker, "QueueTube service worker loaded");
 extensionId = new URL(queueWorker.url).hostname;
-const workerClient = await connect(queueWorker.webSocketDebuggerUrl);
+const workerClient = await connect(queueWorker.webSocketDebuggerUrl, "service worker");
 await workerClient.send("Runtime.enable");
 await workerClient.send("Log.enable");
 const manifestName = await evaluate(workerClient, "chrome.runtime.getManifest().name");
 assert(manifestName === "QueueTube", "Loaded manifest identifies QueueTube", manifestName);
 const manifestVersion = await evaluate(workerClient, "chrome.runtime.getManifest().version");
-assert(manifestVersion === "0.3.0", "Loaded manifest is QueueTube v0.3.0", manifestVersion);
+assert(
+  manifestVersion === expectedManifest.version,
+  `Loaded manifest is QueueTube v${expectedManifest.version}`,
+  manifestVersion
+);
 await evaluate(workerClient, "(async () => { await chrome.storage.local.clear(); await chrome.storage.session.clear(); return true; })()");
 assert(true, "Smoke-test storage started clean");
 
-const searchTarget = initialTargets.find((target) => target.type === "page" && target.url === "about:blank") || await createTarget("about:blank");
-const searchClient = await connect(searchTarget.webSocketDebuggerUrl);
-await searchClient.send("Page.enable");
-await searchClient.send("Runtime.enable");
-await searchClient.send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-await searchClient.send("Page.navigate", { url: "https://www.youtube.com/results?search_query=focus+productivity" });
+const searchUrl = "https://www.youtube.com/results?search_query=focus+productivity";
+await createTarget(searchUrl);
+
+async function connectSearchPage() {
+  return poll(async () => {
+    const target = (await getTargets()).find((candidateTarget) => (
+      candidateTarget.type === "page" && candidateTarget.url.startsWith(searchUrl)
+    ));
+    if (!target) return null;
+
+    const client = await connect(target.webSocketDebuggerUrl, "YouTube search page");
+    try {
+      await client.send("Page.enable");
+      await client.send("Runtime.enable");
+      await client.send("Page.bringToFront");
+      await client.send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+      return client;
+    } catch {
+      client.close();
+      return null;
+    }
+  }, Boolean, 60_000);
+}
+
+let searchClient = await connectSearchPage();
+
+async function evaluateSearch(expression, userGesture = false) {
+  try {
+    return await evaluate(searchClient, expression, userGesture);
+  } catch (error) {
+    if (!error.message.includes("Inspected target navigated or closed")) throw error;
+    searchClient.close();
+    searchClient = await connectSearchPage();
+    return evaluate(searchClient, expression, userGesture);
+  }
+}
 
 const candidate = await poll(
-  () => evaluate(searchClient, `(() => {
+  () => evaluateSearch(`(() => {
     const links = [...document.querySelectorAll('a[href]')];
     const link = links.find((entry) => entry.href.includes('/watch?v=')) || links.find((entry) => entry.href.includes('/shorts/'));
     return link ? { href: link.href, title: link.getAttribute('title') || link.textContent.trim() } : null;
@@ -138,7 +201,7 @@ const candidate = await poll(
 );
 assert(candidate.href.includes("youtube.com"), "Current YouTube results expose a queueable card");
 
-const dispatched = await evaluate(searchClient, `(() => {
+const dispatched = await evaluateSearch(`(() => {
   const link = [...document.querySelectorAll('a[href]')].find((entry) => entry.href === ${JSON.stringify(candidate.href)});
   if (!link) return false;
   return !link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true, button: 0 }));
@@ -152,7 +215,7 @@ const capturedItems = await poll(
 assert(capturedItems.length === 1, "Ctrl-click created one lightweight queue record");
 
 const queuedBadges = await poll(
-  () => evaluate(searchClient, "document.querySelectorAll('[data-queuetube-queued]').length"),
+  () => evaluateSearch("document.querySelectorAll('[data-queuetube-queued]').length"),
   (count) => count >= 1
 );
 assert(queuedBadges >= 1, "Queued thumbnail badge appeared on YouTube");
@@ -162,10 +225,11 @@ await writeFile(resolve(projectRoot, "store-assets", "screenshot-queued-badge-12
 assert(Boolean(searchScreenshot.data), "Queued-badge store screenshot captured");
 
 panelTarget ||= await createTarget(`chrome-extension://${extensionId}/src/sidepanel/sidepanel.html`);
-const panelClient = await connect(panelTarget.webSocketDebuggerUrl);
-await panelClient.send("Page.enable");
+const panelClient = await connect(panelTarget.webSocketDebuggerUrl, "Queue Room");
+await poll(() => panelClient.send("Page.enable"), Boolean, 60_000);
 await panelClient.send("Runtime.enable");
 await panelClient.send("Log.enable");
+await panelClient.send("Page.bringToFront");
 await panelClient.send("Emulation.setDeviceMetricsOverride", { width: 430, height: 800, deviceScaleFactor: 1, mobile: false });
 await poll(() => evaluate(panelClient, "document.querySelector('#total-count')?.textContent"), (value) => value === "1");
 assert(await evaluate(panelClient, "document.querySelector('#total-count').textContent") === "1", "Queue Room rendered persisted state");
@@ -251,7 +315,25 @@ assert(accessibilityAudit.selectedTabs === 1 && accessibilityAudit.liveRegions >
 await panelClient.send("Emulation.setDeviceMetricsOverride", { width: 320, height: 800, deviceScaleFactor: 1, mobile: false });
 await evaluate(panelClient, "document.getElementById('toggle-select').click(); true", true);
 await poll(() => evaluate(panelClient, "document.body.classList.contains('is-selecting')"), Boolean);
-assert(!await evaluate(panelClient, "document.documentElement.scrollWidth > document.documentElement.clientWidth"), "Selection mode reflows at 320 CSS pixels");
+const selectionLayout = await evaluate(panelClient, `(() => ({
+  overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  viewportWidth: document.documentElement.clientWidth,
+  contentWidth: document.documentElement.scrollWidth,
+  offenders: [...document.querySelectorAll('body *')]
+    .filter((element) => {
+      const bounds = element.getBoundingClientRect();
+      return bounds.right > document.documentElement.clientWidth + 0.5 || bounds.left < -0.5;
+    })
+    .slice(0, 8)
+    .map((element) => ({
+      tag: element.tagName.toLowerCase(),
+      id: element.id,
+      className: typeof element.className === 'string' ? element.className : '',
+      left: Math.round(element.getBoundingClientRect().left),
+      right: Math.round(element.getBoundingClientRect().right)
+    }))
+}))()`);
+assert(!selectionLayout.overflow, "Selection mode reflows at 320 CSS pixels", JSON.stringify(selectionLayout));
 await evaluate(panelClient, "document.getElementById('cancel-select').click(); true", true);
 await panelClient.send("Emulation.setDeviceMetricsOverride", { width: 430, height: 800, deviceScaleFactor: 1, mobile: false });
 
@@ -266,7 +348,7 @@ const playerTarget = await poll(
   Boolean,
   30_000
 );
-const playerClient = await connect(playerTarget.webSocketDebuggerUrl);
+const playerClient = await connect(playerTarget.webSocketDebuggerUrl, "YouTube player");
 await playerClient.send("Runtime.enable");
 const playbackState = await poll(
   () => evaluate(playerClient, `({
@@ -280,7 +362,11 @@ const playbackState = await poll(
 assert(playbackState.hasFocusShield, "Focus Shield applied on controlled playback");
 assert(playbackState.paused, "Controlled playback remained paused");
 
-await evaluate(playerClient, "document.querySelector('video').dispatchEvent(new Event('ended')); true");
+try {
+  await evaluate(playerClient, "document.querySelector('video').dispatchEvent(new Event('ended')); true");
+} catch (error) {
+  if (!error.message.includes("Inspected target navigated or closed")) throw error;
+}
 const advancedState = await poll(
   () => evaluate(panelClient, "chrome.runtime.sendMessage({ type: 'GET_APP_STATE' })", true),
   (value) => value?.session?.currentItemId === secondExplicitVideo.itemId && value.session.status === "ready",
@@ -288,8 +374,18 @@ const advancedState = await poll(
 );
 assert(advancedState.session.playerTabId === firstPlayerTabId, "Natural video completion advanced in the same player tab");
 assert(advancedState.history.some((entry) => entry.id === firstExplicitVideo.itemId && entry.outcome === "watched"), "Natural completion recorded a watched outcome");
+const advancedPlayerTarget = await poll(
+  async () => (await getTargets()).find((target) => {
+    if (target.type !== "page" || !target.url.includes("qt_queue=1")) return false;
+    return new URL(target.url).searchParams.get("qt_item") === secondExplicitVideo.itemId;
+  }),
+  Boolean,
+  30_000
+);
+const advancedPlayerClient = await connect(advancedPlayerTarget.webSocketDebuggerUrl, "advanced YouTube player");
+await advancedPlayerClient.send("Runtime.enable");
 await poll(
-  () => evaluate(playerClient, "document.querySelector('video')?.paused ?? null"),
+  () => evaluate(advancedPlayerClient, "document.querySelector('video')?.paused ?? null"),
   (value) => value === true,
   30_000
 );
@@ -307,7 +403,7 @@ assert(Boolean(panelScreenshot.data), "Browser-tested Queue Room screenshot capt
 assert(panelClient.errors.length === 0, "Queue Room reported no runtime errors", panelClient.errors.join(" | "));
 assert(workerClient.errors.length === 0, "Service worker reported no runtime errors", workerClient.errors.join(" | "));
 
-for (const client of [playerClient, panelClient, searchClient, workerClient]) client.close();
+for (const client of [advancedPlayerClient, playerClient, panelClient, searchClient, workerClient]) client.close();
 
 console.log(JSON.stringify({
   ok: true,

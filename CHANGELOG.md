@@ -5,6 +5,18 @@
 
 This changelog records user-facing features, fixes, and compatibility changes for each QueueTube release.
 
+## 0.3.1: 2026-09-14
+
+### Fixed
+
+- Queue Room now opens reliably from its Chrome keyboard shortcut without losing the required user gesture during an asynchronous window lookup
+- Queue Room selection mode now reflows without horizontal scrolling at a 320 CSS-pixel panel width
+- Browser smoke testing now selects QueueTube's exact service worker when Chrome has built-in extension workers and reads the expected version from the manifest
+
+### Preserved
+
+- No new permissions, host access, data collection, or storage migrations
+
 ## 0.3.0: 2026-09-14
 
 ### Added

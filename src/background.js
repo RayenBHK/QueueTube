@@ -969,13 +969,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-chrome.commands.onCommand.addListener((command) => {
+chrome.commands.onCommand.addListener((command, tab) => {
+  if (command === "open-queue-room") {
+    try {
+      if (!Number.isInteger(tab?.windowId)) throw new Error("active-window-unavailable");
+
+      // Chrome requires sidePanel.open() to run synchronously inside the user gesture.
+      const openRequest = chrome.sidePanel.open({ windowId: tab.windowId });
+      void (async () => {
+        try {
+          await openRequest;
+        } catch (error) {
+          console.error("QueueTube shortcut failed", error);
+        }
+      })();
+    } catch (error) {
+      console.error("QueueTube shortcut failed", error);
+    }
+    return;
+  }
+
   void (async () => {
     try {
-      if (command === "open-queue-room") {
-        const currentWindow = await chrome.windows.getLastFocused();
-        await chrome.sidePanel.open({ windowId: currentWindow.id });
-      }
       if (command === "open-next-short") await openNext(QUEUE_KINDS.SHORT);
       if (command === "open-next-video") await openNext(QUEUE_KINDS.VIDEO);
       if (command === "skip-current") await finishCurrent(HISTORY_OUTCOMES.SKIPPED);
