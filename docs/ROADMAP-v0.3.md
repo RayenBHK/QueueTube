@@ -6,7 +6,8 @@
 **Status:** Draft for product-owner additions  
 **Target:** To be decided after scope review  
 **Baseline:** QueueTube v0.2.0  
-**Last updated:** September 13, 2026
+**Last updated:** September 14, 2026
+**Implementation status:** Complete on `codex/v0.3-roadmap`; release verification passed pending final merge/tag.
 
 ## Product outcome
 
@@ -396,24 +397,24 @@ Do not begin G4 while a P0 sequence or migration defect remains open.
 
 | ID | Deliverable | Priority | Size | Status |
 | --- | --- | --- | --- | --- |
-| `V3-001` | Confirm sequence and key semantics | P0 | S | Proposed |
-| `V3-002` | Playback state machine | P0 | L | Proposed |
-| `V3-003` | v0.2.0 to v0.3.0 migration | P0 | M | Proposed |
-| `V3-004` | Same-lane paused advancement for videos and Shorts | P0 | L | Proposed |
-| `V3-005` | Done, Skip, Later, Previous, and recovery actions | P0 | L | Proposed |
-| `V3-006` | Now Playing side-panel block | P0 | L | Proposed |
-| `V3-007` | Popup Continue and Start actions | P0 | M | Proposed |
-| `V3-008` | Shortcut status and onboarding | P0 | M | Proposed |
-| `V3-009` | System, Light, and Dark theme tokens | P0 | L | Proposed |
-| `V3-010` | Responsive and accessibility hardening | P0 | M | Proposed |
-| `V3-011` | YouTube capture and player reliability fixes | P0 | L | Proposed |
-| `V3-012` | v0.3.0 test and release automation | P0 | L | Proposed |
-| `V3-013` | Multi-select and bulk actions | P1 | L | Proposed |
-| `V3-014` | Restore and validate JSON backup | P1 | L | Proposed |
-| `V3-015` | Custom budgets and budget-complete state | P1 | M | Proposed |
-| `V3-016` | History filters and safe restoration | P1 | M | Proposed |
-| `V3-017` | Compact density and large-queue polish | P1 | M | Proposed |
-| `V3-018` | Missing and unavailable metadata states | P1 | M | Proposed |
+| `V3-001` | Confirm sequence and key semantics | P0 | S | Complete |
+| `V3-002` | Playback state machine | P0 | L | Complete |
+| `V3-003` | v0.2.0 to v0.3.0 migration | P0 | M | Complete |
+| `V3-004` | Same-lane paused advancement for videos and Shorts | P0 | L | Complete |
+| `V3-005` | Done, Skip, Later, Previous, and recovery actions | P0 | L | Complete |
+| `V3-006` | Now Playing side-panel block | P0 | L | Complete |
+| `V3-007` | Popup Continue and Start actions | P0 | M | Complete |
+| `V3-008` | Shortcut status and onboarding | P0 | M | Complete |
+| `V3-009` | System, Light, and Dark theme tokens | P0 | L | Complete |
+| `V3-010` | Responsive and accessibility hardening | P0 | M | Complete |
+| `V3-011` | YouTube capture and player reliability fixes | P0 | L | Complete |
+| `V3-012` | v0.3.0 test and release automation | P0 | L | Complete |
+| `V3-013` | Multi-select and bulk actions | P1 | L | Complete |
+| `V3-014` | Restore and validate JSON backup | P1 | L | Complete |
+| `V3-015` | Custom budgets and budget-complete state | P1 | M | Complete |
+| `V3-016` | History filters and safe restoration | P1 | M | Complete |
+| `V3-017` | Compact density and large-queue polish | P1 | M | Complete |
+| `V3-018` | Missing and unavailable metadata states | P1 | M | Complete |
 | `V3-019` | Queue search | P2 | M | Backlog |
 | `V3-020` | Channel grouping and filters | P2 | L | Backlog |
 | `V3-021` | Named local sessions | P2 | L | Backlog |
@@ -453,13 +454,13 @@ These ideas require a separate product and privacy review rather than entering t
 
 | Decision | Recommended default | Status |
 | --- | --- | --- |
-| What should `N` do? | Move the current item to Later, then load the next item paused. | Needs confirmation |
-| Should completed long videos load the next video? | Yes, load it paused as Shorts do. | Needs confirmation |
-| What happens after the Shorts lane ends? | Stop and show a Start videos handoff button. | Needs confirmation |
-| Which theme should a new install use? | System. | Needs confirmation |
-| Should budget time count while the player is paused? | Count active session wall time until the budget is paused explicitly. | Needs confirmation |
-| Should Classic Mode gain new features? | Preserve and fix it, but invest new playback work in Queue Room. | Needs confirmation |
-| Are P1 bulk tools part of v0.3.0 or the next release? | Include restore backup and custom budgets; move the rest if P0 slips. | Needs confirmation |
+| What should `N` do? | Move the current item to Later, then load the next item paused. | Accepted and implemented |
+| Should completed long videos load the next video? | Yes, load it paused as Shorts do. | Accepted and implemented |
+| What happens after the Shorts lane ends? | Stop and show a Start videos handoff button. | Accepted and implemented |
+| Which theme should a new install use? | System. | Accepted and implemented |
+| Should budget time count while the player is paused? | Count session wall time; ∞ removes the active limit. | Accepted and implemented |
+| Should Classic Mode gain new features? | Preserve and fix it, but invest new playback work in Queue Room. | Accepted and implemented |
+| Are P1 bulk tools part of v0.3.0 or the next release? | Include bulk actions, restore, custom budgets, history filters, and compact density. | Accepted and implemented |
 
 ## Add new requests here
 

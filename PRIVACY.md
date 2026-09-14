@@ -5,19 +5,19 @@
 
 QueueTube stores your queue and preferences on your device. It has no QueueTube server, account system, analytics, advertising, or data sale.
 
-Last updated: September 13, 2026
+Last updated: September 14, 2026
 
 ## Data QueueTube handles
 
 QueueTube reads the YouTube link and visible card metadata for videos you deliberately queue. That metadata can include the video's identifier, title, channel name, thumbnail URL, duration, and collection time.
 
-QueueTube also stores your settings, viewing-session budget, current QueueTube player reference, and watched or skipped history.
+QueueTube also stores your settings, theme choice, viewing-session budget, current QueueTube player state, and watched or skipped history.
 
 ## How QueueTube stores data
 
 Queue items, history, and settings stay in Chrome's local extension storage on your device. Session budgets and the current player reference remain until Chrome closes.
 
-QueueTube does not use synchronized storage. It does not send stored data to the QueueTube developer or any third party.
+QueueTube does not use synchronized storage. It does not send stored data to the QueueTube developer or any third party. When you copy or paste a backup, the JSON is handled locally through the clipboard and QueueTube interface; QueueTube does not upload it.
 
 ## Requests to YouTube
 
@@ -33,7 +33,7 @@ QueueTube does not sell, rent, share, or use your data for advertising, credit d
 
 QueueTube keeps local queue and history records until you remove them, clear them in the Queue Room, clear the extension's site data, or uninstall the extension.
 
-Use **Clear queue** to delete waiting picks. Open **History**, then use **Clear history** to delete watched and skipped records.
+Use **Clear queue** or bulk Remove to delete waiting picks. Open **History**, then use **Clear history** to delete watched and skipped records. A Replace restore deliberately replaces the stored queue and resets its active playback session after you choose that mode.
 
 ## Policy changes
 

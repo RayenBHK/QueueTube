@@ -25,8 +25,8 @@ QueueTube persists data according to its lifetime:
 
 | Storage area | Data | Lifetime |
 | --- | --- | --- |
-| `chrome.storage.local` | Queue items, history, and settings | Until the extension or data is removed |
-| `chrome.storage.session` | Player tab, current item, and time budget | Until Chrome closes |
+| `chrome.storage.local` | Schema version, queue items, history, and settings | Until the extension or data is removed |
+| `chrome.storage.session` | Playback state, player tab, current item, transition token, and time budget | Until Chrome closes |
 
 The service worker stores no mutable queue state in global variables. Each event reads the current value before it writes an update.
 
@@ -56,8 +56,40 @@ The playback URL carries three QueueTube parameters:
 - `qt_queue=1`: identifies controlled playback
 - `qt_kind`: preserves the item's lane after a Short becomes a regular watch URL
 - `qt_item`: maps playback back to the stored queue record
+- `qt_transition`: identifies one exact player navigation and rejects late events from the previous page
 
-The content script pauses a controlled page until a pointer or keyboard action targets the player. When a Short ends, it records the outcome and loads the next Short into the same tab. The next Short remains paused.
+The content script pauses a controlled page until a pointer or keyboard action targets the player. When either a Short or long video ends, QueueTube records the outcome and loads the next item in that lane into the same tab. Every new item remains paused. When a lane ends, QueueTube stops and exposes a deliberate handoff to the other lane.
+
+## Guard playback transitions
+
+The Queue Room session uses these explicit states:
+
+```mermaid
+stateDiagram-v2
+  [*] --> idle
+  idle --> loading
+  loading --> ready
+  ready --> playing
+  playing --> ready
+  ready --> advancing
+  playing --> advancing
+  advancing --> loading
+  advancing --> lane_complete
+  loading --> error
+  ready --> budget_complete
+  playing --> budget_complete
+  budget_complete --> ready
+```
+
+Player writes run under a dedicated `navigator.locks` lock. Queue writes use a separate lock. Done, Skip, Later, Previous, and natural completion therefore serialize without blocking ordinary reads. A page event must match the stored player tab, item ID, and transition token before it can change state or history.
+
+`N` is a queue operation rather than an outcome: it moves the current item to the end of its lane, does not write history, and loads the following item paused. Done and natural completion record `watched`; Skip records `skipped`; Previous removes the newest history entry and restores it to its lane.
+
+## Migrate and restore local data
+
+`qtSchemaVersion` is `3`. Installation and version updates rebuild supported stored records through the same sanitizers used for new captures. Migration is idempotent and keeps valid v0.2 queue items, settings, and history while discarding malformed records individually.
+
+Backup restore accepts schema 2 or 3 JSON only. Merge preserves current settings and adds validated, non-duplicate records. Replace applies validated backup settings and resets the active queue session. Backup text is parsed as data and never inserted as HTML.
 
 ## Limit YouTube access
 
@@ -86,6 +118,6 @@ Classic tab state belongs to Chrome, not QueueTube's local Queue Room. Switching
 
 ## Recover from failures
 
-QueueTube treats missing tabs, page navigation races, and stale group identifiers as recoverable states. The next action reads current storage and tab state again.
+QueueTube treats missing tabs, page navigation races, stale player events, invalid backups, and stale group identifiers as recoverable states. The next action reads current storage and tab state again.
 
 If Chrome removes the player tab, QueueTube clears its session reference. The next playback request creates a replacement tab.

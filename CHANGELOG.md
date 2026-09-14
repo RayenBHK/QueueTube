@@ -5,6 +5,37 @@
 
 This changelog records user-facing features, fixes, and compatibility changes for each QueueTube release.
 
+## 0.3.0: 2026-09-14
+
+### Added
+
+- Guarded playback state machine with per-navigation tokens and stale-event rejection
+- Same-lane paused advancement for both Shorts and long videos
+- Now Playing deck with state, lane position, next context, Focus, Previous, Done, Later, and Skip
+- Deliberate Shorts-to-Videos lane handoff
+- `W` Done, `N` Later, `P` Previous, `X` Skip, and `?` help on controlled player pages
+- Live Chrome shortcut-assignment status and shortcut-settings launcher
+- System, Light, and Dark themes plus optional compact density
+- Custom 1–180 minute session budgets and an enforced budget-complete state
+- Multi-select Move top, Move bottom, and Remove actions
+- Validated v2/v3 JSON backup restore with Merge and Replace modes
+- Watched, skipped, Short, and video history filters with per-item restoration
+- Schema 3 migration for v0.2 queue, history, settings, and session data
+
+### Changed
+
+- Natural completion and Done now record the current pick before loading the next one paused
+- `N` now means Later instead of silently moving forward
+- The toolbar popup prioritizes Continue when a controlled player exists
+- Queue and player writes use separate browser locks to prevent double outcomes and duplicate player tabs
+- Browser smoke coverage now includes v0.3 sequencing, restore, bulk actions, themes, accessibility state, and custom budgets
+
+### Preserved
+
+- No new permissions or host access
+- No server, analytics, account, remote code, or synchronized storage
+- Classic grouped-tab mode remains available without expanding its scope
+
 ## 0.2.0: 2026-09-13
 
 ### Added
