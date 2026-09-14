@@ -120,6 +120,14 @@ Complete the Queue Room test with a keyboard:
 
 Enable reduced motion in Windows and confirm hover or state changes do not depend on animation.
 
+## Verify Chrome shortcuts
+
+1. Open `chrome://extensions/shortcuts` and assign a key to **Open the QueueTube Queue Room**.
+2. Focus a regular browser tab and press the assigned shortcut.
+3. Confirm the Queue Room opens in that tab's window.
+4. Close and reopen `chrome://extensions`, then open QueueTube's **Errors** page.
+5. Confirm there is no new `sidePanel.open() may only be called in response to a user gesture` error.
+
 ## Build and inspect the store package
 
 Create the release ZIP:
@@ -128,7 +136,7 @@ Create the release ZIP:
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/package-extension.ps1
 ```
 
-Open `dist/queuetube-v0.3.0.zip`. It must contain only `manifest.json`, `assets/`, and `src/`. It must not contain repository metadata, tests, documentation, store assets, or environment files.
+Open `dist/queuetube-v0.3.1.zip`. It must contain only `manifest.json`, `assets/`, and `src/`. It must not contain repository metadata, tests, documentation, store assets, or environment files.
 
 Complete the remaining checks in [CHROMEWEBSTORE.md](../CHROMEWEBSTORE.md) before uploading the ZIP.
 

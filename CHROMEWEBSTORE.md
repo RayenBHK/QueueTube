@@ -3,7 +3,7 @@
 
 # Prepare QueueTube for the Chrome Web Store
 
-This document contains copy-ready listing text, permission reasons, privacy disclosures, assets, and submission status for QueueTube 0.3.0.
+This document contains copy-ready listing text, permission reasons, privacy disclosures, assets, and submission status for QueueTube 0.3.1.
 
 > Last updated: 2026-09-14
 
@@ -55,7 +55,7 @@ Report defects or request features at https://github.com/RayenBHK/QueueTube/issu
 
 QueueTube is an independent project. It is not affiliated with or endorsed by YouTube or Google.
 
-Version 0.3.0 adds reliable paused sequencing for both lanes, Now Playing controls, player keys, shortcut setup, themes, bulk tools, validated backup restore, custom budgets, and filtered history.
+Version 0.3.1 fixes Queue Room opening from its Chrome keyboard shortcut. It includes the paused sequencing, Now Playing controls, player keys, themes, bulk tools, validated backup restore, custom budgets, and filtered history added in 0.3.0.
 
 **Category**
 
@@ -159,6 +159,7 @@ https://github.com/RayenBHK/QueueTube
 
 | Version | Date | Changes | Status |
 | --- | --- | --- | --- |
+| 0.3.1 | 2026-09-14 | Fix Queue Room shortcut opening and narrow-panel selection overflow | Automated checks passed; manual Chrome verification pending |
 | 0.3.0 | 2026-09-14 | Paused sequencing, Now Playing, player keys, shortcut onboarding, themes, bulk/restore tools, custom budgets, and history filters | Release candidate verified |
 | 0.2.0 | 2026-09-13 | Queue Room, one-tab playback, time budgets, local history, Focus Shield, tab import, and release tooling | Ready for dashboard upload |
 | 0.1.0 | 2026-09-13 | Initial grouped-tab prototype | Not submitted |
@@ -167,15 +168,15 @@ https://github.com/RayenBHK/QueueTube
 
 ### Package and behavior
 
-- [x] Manifest V3 with version 0.3.0
+- [x] Manifest V3 with version 0.3.1
 - [x] Manifest name and short description match this listing
 - [x] Host access stays scoped to YouTube
 - [x] Every permission has a feature-specific reason
 - [x] Local files and icon dimensions pass automated checks
 - [x] Package script excludes repository, tests, docs, and store assets
 - [x] No remote JavaScript, analytics, obfuscation, or synchronized storage
-- [x] Complete the final unpacked-extension test on current YouTube with Chrome for Testing 151
-- [x] Confirm popup, side panel, service worker, and content-script consoles have no errors
+- [ ] Complete the final unpacked-extension test on current YouTube after reloading version 0.3.1
+- [ ] Confirm popup, side panel, service worker, and content-script consoles have no new errors
 
 ### Listing and account
 
@@ -185,7 +186,7 @@ https://github.com/RayenBHK/QueueTube
 - [x] Capture the real-YouTube screenshot after final browser testing
 - [ ] Verify the public privacy-policy URL
 - [ ] Add and verify a monitored public contact email
-- [ ] Upload `dist/queuetube-v0.3.0.zip` through the Chrome Developer Dashboard
+- [ ] Upload `dist/queuetube-v0.3.1.zip` through the Chrome Developer Dashboard
 
 ## Review notes
 
