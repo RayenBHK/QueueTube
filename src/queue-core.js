@@ -13,6 +13,25 @@ export const HISTORY_OUTCOMES = Object.freeze({
   SKIPPED: "skipped"
 });
 
+export const SCHEMA_VERSION = 3;
+
+export const THEMES = Object.freeze({
+  SYSTEM: "system",
+  LIGHT: "light",
+  DARK: "dark"
+});
+
+export const PLAYBACK_STATES = Object.freeze({
+  IDLE: "idle",
+  LOADING: "loading",
+  READY: "ready",
+  PLAYING: "playing",
+  ADVANCING: "advancing",
+  LANE_COMPLETE: "lane-complete",
+  BUDGET_COMPLETE: "budget-complete",
+  ERROR: "error"
+});
+
 export const QUEUE_GROUPS = Object.freeze({
   [QUEUE_KINDS.SHORT]: {
     title: "QueueTube · Shorts",
@@ -37,8 +56,24 @@ export const DEFAULT_SETTINGS = Object.freeze({
   focusShield: true,
   showQueuedBadges: true,
   autoAdvanceShorts: true,
+  autoAdvanceVideos: true,
   removeFinished: true,
-  defaultBudgetMinutes: 0
+  defaultBudgetMinutes: 0,
+  theme: THEMES.SYSTEM,
+  compactDensity: false
+});
+
+export const DEFAULT_SESSION = Object.freeze({
+  status: PLAYBACK_STATES.IDLE,
+  playerTabId: null,
+  currentItemId: null,
+  currentKind: null,
+  completedLane: null,
+  budgetMinutes: 0,
+  startedAt: null,
+  sessionId: null,
+  transitionToken: null,
+  lastError: null
 });
 
 const YOUTUBE_HOSTS = new Set([
@@ -49,6 +84,51 @@ const YOUTUBE_HOSTS = new Set([
 ]);
 
 const MAX_TEXT_LENGTH = 300;
+const MAX_BACKUP_ITEMS = 2000;
+
+const SESSION_TRANSITIONS = Object.freeze({
+  [PLAYBACK_STATES.IDLE]: new Set([PLAYBACK_STATES.LOADING, PLAYBACK_STATES.BUDGET_COMPLETE]),
+  [PLAYBACK_STATES.LOADING]: new Set([
+    PLAYBACK_STATES.READY,
+    PLAYBACK_STATES.ADVANCING,
+    PLAYBACK_STATES.ERROR,
+    PLAYBACK_STATES.IDLE
+  ]),
+  [PLAYBACK_STATES.READY]: new Set([
+    PLAYBACK_STATES.PLAYING,
+    PLAYBACK_STATES.LOADING,
+    PLAYBACK_STATES.ADVANCING,
+    PLAYBACK_STATES.BUDGET_COMPLETE,
+    PLAYBACK_STATES.ERROR,
+    PLAYBACK_STATES.IDLE
+  ]),
+  [PLAYBACK_STATES.PLAYING]: new Set([
+    PLAYBACK_STATES.READY,
+    PLAYBACK_STATES.LOADING,
+    PLAYBACK_STATES.ADVANCING,
+    PLAYBACK_STATES.BUDGET_COMPLETE,
+    PLAYBACK_STATES.ERROR,
+    PLAYBACK_STATES.IDLE
+  ]),
+  [PLAYBACK_STATES.ADVANCING]: new Set([
+    PLAYBACK_STATES.LOADING,
+    PLAYBACK_STATES.LANE_COMPLETE,
+    PLAYBACK_STATES.ERROR,
+    PLAYBACK_STATES.IDLE
+  ]),
+  [PLAYBACK_STATES.LANE_COMPLETE]: new Set([PLAYBACK_STATES.LOADING, PLAYBACK_STATES.IDLE]),
+  [PLAYBACK_STATES.BUDGET_COMPLETE]: new Set([
+    PLAYBACK_STATES.READY,
+    PLAYBACK_STATES.LOADING,
+    PLAYBACK_STATES.ADVANCING,
+    PLAYBACK_STATES.IDLE
+  ]),
+  [PLAYBACK_STATES.ERROR]: new Set([
+    PLAYBACK_STATES.LOADING,
+    PLAYBACK_STATES.ADVANCING,
+    PLAYBACK_STATES.IDLE
+  ])
+});
 
 function parseUrl(rawUrl) {
   try {
@@ -227,6 +307,27 @@ export function addQueueItem(items, item, { preventDuplicates = true } = {}) {
   return { items: safeItems, item: queuedItem, added: true, reason: null };
 }
 
+export function deferQueueItem(items, itemId) {
+  const safeItems = Array.isArray(items) ? [...items] : [];
+  const item = safeItems.find((entry) => entry.id === itemId);
+  if (!item) return { items: safeItems, item: null, nextItem: null, moved: false, reason: "missing-item" };
+
+  const lane = getLane(safeItems, item.kind);
+  if (lane.length < 2) {
+    return { items: safeItems, item, nextItem: null, moved: false, reason: "only-item" };
+  }
+
+  const currentIndex = lane.findIndex((entry) => entry.id === itemId);
+  const nextItem = lane[(currentIndex + 1) % lane.length];
+  return {
+    items: reorderQueueItem(safeItems, itemId, lane.length - 1),
+    item,
+    nextItem,
+    moved: true,
+    reason: null
+  };
+}
+
 export function removeQueueItem(items, itemId) {
   return (Array.isArray(items) ? items : []).filter((item) => item.id !== itemId);
 }
@@ -282,4 +383,160 @@ export function isBudgetExpired(session, now = Date.now()) {
 export function historyEntry(item, outcome, now = Date.now()) {
   if (!item || !Object.values(HISTORY_OUTCOMES).includes(outcome)) return null;
   return { ...item, outcome, completedAt: now };
+}
+
+export function sanitizeSettings(rawSettings = {}) {
+  const raw = rawSettings && typeof rawSettings === "object" ? rawSettings : {};
+  const next = { ...DEFAULT_SETTINGS };
+
+  for (const [key, defaultValue] of Object.entries(DEFAULT_SETTINGS)) {
+    const value = raw[key];
+    if (typeof defaultValue === "boolean" && typeof value === "boolean") next[key] = value;
+  }
+  if (Object.values(CAPTURE_MODES).includes(raw.captureMode)) next.captureMode = raw.captureMode;
+  if (Object.values(THEMES).includes(raw.theme)) next.theme = raw.theme;
+  if (Number.isInteger(raw.defaultBudgetMinutes) && raw.defaultBudgetMinutes >= 0 && raw.defaultBudgetMinutes <= 180) {
+    next.defaultBudgetMinutes = raw.defaultBudgetMinutes;
+  }
+  return next;
+}
+
+export function createSession(rawSession = {}) {
+  const raw = rawSession && typeof rawSession === "object" ? rawSession : {};
+  const status = Object.values(PLAYBACK_STATES).includes(raw.status) ? raw.status : PLAYBACK_STATES.IDLE;
+  const kind = Object.values(QUEUE_KINDS).includes(raw.currentKind) ? raw.currentKind : null;
+  const completedLane = Object.values(QUEUE_KINDS).includes(raw.completedLane) ? raw.completedLane : null;
+  const budgetMinutes = Number.isFinite(raw.budgetMinutes)
+    ? Math.max(0, Math.min(180, Math.floor(raw.budgetMinutes)))
+    : 0;
+
+  return {
+    ...DEFAULT_SESSION,
+    status,
+    playerTabId: Number.isInteger(raw.playerTabId) ? raw.playerTabId : null,
+    currentItemId: typeof raw.currentItemId === "string" ? raw.currentItemId : null,
+    currentKind: kind,
+    completedLane,
+    budgetMinutes,
+    startedAt: Number.isFinite(raw.startedAt) ? raw.startedAt : null,
+    sessionId: typeof raw.sessionId === "string" ? raw.sessionId : null,
+    transitionToken: typeof raw.transitionToken === "string" ? raw.transitionToken : null,
+    lastError: typeof raw.lastError === "string" ? cleanText(raw.lastError) : null
+  };
+}
+
+export function transitionSession(session, nextStatus, patch = {}) {
+  const current = createSession(session);
+  if (!Object.values(PLAYBACK_STATES).includes(nextStatus)) {
+    return { ok: false, reason: "invalid-state", session: current };
+  }
+  if (current.status !== nextStatus && !SESSION_TRANSITIONS[current.status]?.has(nextStatus)) {
+    return { ok: false, reason: "invalid-transition", session: current };
+  }
+  return { ok: true, session: createSession({ ...current, ...patch, status: nextStatus }) };
+}
+
+function rebuildItems(rawItems, settings) {
+  const source = Array.isArray(rawItems) ? rawItems.slice(0, MAX_BACKUP_ITEMS) : [];
+  let items = [];
+  let invalid = 0;
+  for (const rawItem of source) {
+    const item = createQueueItem(
+      rawItem?.sourceUrl || rawItem?.playbackUrl,
+      rawItem,
+      Number.isFinite(rawItem?.addedAt) ? rawItem.addedAt : Date.now(),
+      settings
+    );
+    if (!item) {
+      invalid += 1;
+      continue;
+    }
+    items = addQueueItem(items, item, { preventDuplicates: false }).items;
+  }
+  return { items, invalid };
+}
+
+function rebuildHistory(rawHistory, settings) {
+  const source = Array.isArray(rawHistory) ? rawHistory.slice(0, 200) : [];
+  const history = [];
+  for (const rawEntry of source) {
+    const item = createQueueItem(
+      rawEntry?.sourceUrl || rawEntry?.playbackUrl,
+      rawEntry,
+      Number.isFinite(rawEntry?.addedAt) ? rawEntry.addedAt : Date.now(),
+      settings
+    );
+    if (!item || !Object.values(HISTORY_OUTCOMES).includes(rawEntry?.outcome)) continue;
+    history.push({
+      ...item,
+      outcome: rawEntry.outcome,
+      completedAt: Number.isFinite(rawEntry.completedAt) ? rawEntry.completedAt : Date.now(),
+      sessionId: typeof rawEntry.sessionId === "string" ? rawEntry.sessionId : null
+    });
+  }
+  return history;
+}
+
+export function migratePersistentState(existing = {}) {
+  const legacySettings = Object.fromEntries(
+    Object.keys(DEFAULT_SETTINGS)
+      .filter((key) => existing[key] !== undefined)
+      .map((key) => [key, existing[key]])
+  );
+  const settings = sanitizeSettings({ ...legacySettings, ...(existing.qtSettings || {}) });
+  const rebuilt = rebuildItems(existing.qtQueueItems, settings);
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    settings,
+    items: rebuilt.items,
+    history: rebuildHistory(existing.qtHistory, settings),
+    invalidItems: rebuilt.invalid
+  };
+}
+
+export function restoreBackupPayload(payload, currentItems, currentSettings, mode = "merge") {
+  if (!payload || typeof payload !== "object" || ![2, 3].includes(Number(payload.version))) {
+    return { ok: false, reason: "unsupported-backup" };
+  }
+  if (!Array.isArray(payload.items) || payload.items.length > MAX_BACKUP_ITEMS) {
+    return { ok: false, reason: "invalid-items" };
+  }
+
+  const replace = mode === "replace";
+  const settings = replace
+    ? sanitizeSettings({ ...currentSettings, ...(payload.settings || {}) })
+    : sanitizeSettings(currentSettings);
+  let items = replace ? [] : Array.isArray(currentItems) ? [...currentItems] : [];
+  let imported = 0;
+  let duplicates = 0;
+  let invalid = 0;
+
+  for (const rawItem of payload.items) {
+    const item = createQueueItem(
+      rawItem?.sourceUrl || rawItem?.playbackUrl,
+      rawItem,
+      Number.isFinite(rawItem?.addedAt) ? rawItem.addedAt : Date.now(),
+      settings
+    );
+    if (!item) {
+      invalid += 1;
+      continue;
+    }
+    const result = addQueueItem(items, item, { preventDuplicates: settings.preventDuplicates });
+    items = result.items;
+    if (result.added) imported += 1;
+    else if (result.reason === "duplicate") duplicates += 1;
+  }
+
+  return {
+    ok: true,
+    version: Number(payload.version),
+    mode: replace ? "replace" : "merge",
+    items,
+    settings,
+    history: rebuildHistory(payload.history, settings),
+    imported,
+    duplicates,
+    invalid
+  };
 }

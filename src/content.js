@@ -18,7 +18,9 @@
 
   let settings = { ...DEFAULT_SETTINGS };
   let queuedPageKey = null;
+  let transitionToken = null;
   let manualPlaybackUnlocked = false;
+  let budgetToastShown = false;
   let toastTimer = null;
   let badgeRefreshTimer = null;
   let observedVideo = null;
@@ -115,10 +117,13 @@
     void sendToQueue(anchor, url);
   }
 
-  function currentQueueKey() {
+  function currentQueueContext() {
     const url = new URL(location.href);
-    if (url.searchParams.get("qt_queue") !== "1") return null;
-    return url.searchParams.get("qt_item") || `${url.searchParams.get("qt_kind") || "video"}:${url.searchParams.get("v") || url.pathname}`;
+    if (url.searchParams.get("qt_queue") !== "1") return { itemId: null, transitionToken: null };
+    return {
+      itemId: url.searchParams.get("qt_item") || `${url.searchParams.get("qt_kind") || "video"}:${url.searchParams.get("v") || url.pathname}`,
+      transitionToken: url.searchParams.get("qt_transition")
+    };
   }
 
   function shouldBlockPlayback() {
@@ -150,20 +155,27 @@
   }
 
   async function handleQueueShortcut(event) {
-    if (!queuedPageKey || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+    if (!queuedPageKey || event.ctrlKey || event.metaKey || event.altKey) return;
     const target = event.target;
     if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable) return;
-    const action = { n: "NEXT_ITEM", p: "PREVIOUS_ITEM", x: "SKIP_CURRENT" }[event.key.toLowerCase()];
+    if (event.key === "?") {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleKeyboardHelp();
+      return;
+    }
+    const action = { n: "DEFER_CURRENT", p: "PREVIOUS_ITEM", x: "SKIP_CURRENT", w: "FINISH_CURRENT" }[event.key.toLowerCase()];
     if (!action) return;
     event.preventDefault();
     event.stopPropagation();
     try {
-      const result = await chrome.runtime.sendMessage({ type: action });
+      const result = await chrome.runtime.sendMessage({ type: action, outcome: action === "FINISH_CURRENT" ? "watched" : undefined });
       if (!result?.ok) {
         const messages = {
           "no-history": "No previous pick yet",
           "budget-finished": "Time budget complete",
-          "no-current-item": "No active QueueTube pick"
+          "no-current-item": "No active QueueTube pick",
+          "only-item": "That is the only pick in this lane"
         };
         showToast(messages[result?.reason] || "Queue action unavailable", "error");
       }
@@ -175,8 +187,8 @@
   async function onPlayerEnded() {
     if (!queuedPageKey) return;
     try {
-      const result = await chrome.runtime.sendMessage({ type: "PLAYER_ENDED" });
-      if (result?.queueEnded) showToast("Shorts lane complete", "short");
+      const result = await chrome.runtime.sendMessage({ type: "PLAYER_ENDED", itemId: queuedPageKey, transitionToken });
+      if (result?.queueEnded) showToast(result.completedLane === "video" ? "Videos lane complete" : "Shorts lane complete", result.completedLane || "short");
       if (result?.reason === "budget-finished") showToast("Time budget complete", "error");
     } catch {
       // Navigation may destroy this content-script context before the response arrives.
@@ -197,14 +209,84 @@
   }
 
   function syncQueuePage() {
-    const nextKey = currentQueueKey();
-    if (nextKey !== queuedPageKey) {
-      queuedPageKey = nextKey;
+    const context = currentQueueContext();
+    if (context.itemId !== queuedPageKey || context.transitionToken !== transitionToken) {
+      queuedPageKey = context.itemId;
+      transitionToken = context.transitionToken;
       manualPlaybackUnlocked = false;
+      budgetToastShown = false;
     }
     applyFocusShield();
     enforcePlaybackPolicy();
     window.setTimeout(bindCurrentVideo, 250);
+  }
+
+  async function reportPlayerState(state, media) {
+    if (!queuedPageKey || !transitionToken) return;
+    try {
+      const result = await chrome.runtime.sendMessage({
+        type: "PLAYER_STATE",
+        state,
+        itemId: queuedPageKey,
+        transitionToken
+      });
+      if (result?.shouldPause && media instanceof HTMLMediaElement) {
+        pauseMedia(media);
+        if (result.session?.status === "budget-complete" && !budgetToastShown) {
+          budgetToastShown = true;
+          showToast("Time budget complete", "error");
+        }
+      }
+    } catch {
+      // A navigation can retire this content script during the status report.
+    }
+  }
+
+  async function enforceBudgetPolicy() {
+    if (!queuedPageKey || !transitionToken) return;
+    try {
+      const result = await chrome.runtime.sendMessage({
+        type: "GET_PLAYER_POLICY",
+        itemId: queuedPageKey,
+        transitionToken
+      });
+      if (!result?.shouldPause) return;
+      document.querySelectorAll("video, audio").forEach(pauseMedia);
+      if (result.budgetExpired && !budgetToastShown) {
+        budgetToastShown = true;
+        showToast("Time budget complete", "error");
+      }
+    } catch {
+      // The next navigation or extension reload reconnects the policy check.
+    }
+  }
+
+  function toggleKeyboardHelp() {
+    let host = document.getElementById("queuetube-help-root");
+    if (host) {
+      host.remove();
+      return;
+    }
+    host = document.createElement("div");
+    host.id = "queuetube-help-root";
+    const shadow = host.attachShadow({ mode: "open" });
+    shadow.innerHTML = `
+      <style>
+        :host { all: initial; }
+        .card { position: fixed; z-index: 2147483647; right: 22px; bottom: 22px; width: min(330px, calc(100vw - 44px));
+          padding: 18px; border: 1px solid #526663; border-top: 4px solid #6f8cff; border-radius: 10px;
+          color: #f4f8f7; background: #14201f; box-shadow: 0 16px 48px rgba(0,0,0,.42); font: 13px/1.4 "Segoe UI", sans-serif; }
+        p { margin: 0 0 11px; color: #9fb5b2; font: 700 10px/1 Consolas, monospace; letter-spacing: .09em; }
+        dl { margin: 0; } div { display: grid; grid-template-columns: 34px 1fr; gap: 9px; align-items: center; min-height: 38px; border-bottom: 1px solid #31413f; }
+        dt, dd { margin: 0; } kbd { display: inline-grid; place-items: center; width: 27px; height: 25px; border: 1px solid #728582; border-bottom-width: 2px; border-radius: 4px; background: #202e2c; font: 700 12px/1 Consolas, monospace; }
+        dd { color: #dce7e4; } small { display: block; margin-top: 11px; color: #9fb5b2; }
+        @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+      </style>
+      <section class="card" role="dialog" aria-label="QueueTube keyboard help"><p>QUEUETUBE PLAYER KEYS</p><dl>
+        <div><dt><kbd>W</kbd></dt><dd>Done · load next paused</dd></div><div><dt><kbd>N</kbd></dt><dd>Later · rotate to lane end</dd></div>
+        <div><dt><kbd>P</kbd></dt><dd>Restore previous pick</dd></div><div><dt><kbd>X</kbd></dt><dd>Skip · load next paused</dd></div>
+        <div><dt><kbd>?</kbd></dt><dd>Close this guide</dd></div></dl><small>Space or K still controls YouTube play/pause.</small></section>`;
+    (document.documentElement || document).appendChild(host);
   }
 
   async function refreshQueuedBadges() {
@@ -314,7 +396,12 @@
   window.addEventListener("click", handleModifiedClick, true);
   window.addEventListener("auxclick", handleMiddleClick, true);
   document.addEventListener("play", (event) => {
-    if (shouldBlockPlayback() && event.target instanceof HTMLMediaElement) pauseMedia(event.target);
+    if (!(event.target instanceof HTMLMediaElement)) return;
+    if (shouldBlockPlayback()) pauseMedia(event.target);
+    else void reportPlayerState("playing", event.target);
+  }, true);
+  document.addEventListener("pause", (event) => {
+    if (event.target instanceof HTMLMediaElement && queuedPageKey) void reportPlayerState("ready", event.target);
   }, true);
   document.addEventListener("visibilitychange", enforcePlaybackPolicy, true);
   document.addEventListener("pointerdown", unlockFromPointer, true);
@@ -323,5 +410,6 @@
   document.addEventListener("yt-navigate-finish", syncQueuePage, true);
   window.addEventListener("popstate", syncQueuePage, true);
   document.addEventListener("DOMContentLoaded", syncQueuePage, { once: true });
+  window.setInterval(() => void enforceBudgetPolicy(), 1000);
   void initialize();
 })();

@@ -98,12 +98,12 @@ async function evaluate(client, expression, userGesture = false) {
 }
 
 let initialTargets = await getTargets();
-let queueWorker = initialTargets.find((target) => target.type === "service_worker" && target.url.endsWith("/src/background.js"));
+let queueWorker = initialTargets.find((target) => target.type === "service_worker" && target.url.endsWith("/background.js"));
 let panelTarget = null;
 if (!queueWorker && extensionId) {
   panelTarget = await createTarget(`chrome-extension://${extensionId}/src/sidepanel/sidepanel.html`);
   queueWorker = await poll(
-    async () => (await getTargets()).find((target) => target.type === "service_worker" && target.url.endsWith("/src/background.js")),
+    async () => (await getTargets()).find((target) => target.type === "service_worker" && target.url.endsWith("/background.js")),
     Boolean
   );
   initialTargets = await getTargets();
@@ -115,6 +115,8 @@ await workerClient.send("Runtime.enable");
 await workerClient.send("Log.enable");
 const manifestName = await evaluate(workerClient, "chrome.runtime.getManifest().name");
 assert(manifestName === "QueueTube", "Loaded manifest identifies QueueTube", manifestName);
+const manifestVersion = await evaluate(workerClient, "chrome.runtime.getManifest().version");
+assert(manifestVersion === "0.3.0", "Loaded manifest is QueueTube v0.3.0", manifestVersion);
 await evaluate(workerClient, "(async () => { await chrome.storage.local.clear(); await chrome.storage.session.clear(); return true; })()");
 assert(true, "Smoke-test storage started clean");
 
@@ -164,6 +166,7 @@ const panelClient = await connect(panelTarget.webSocketDebuggerUrl);
 await panelClient.send("Page.enable");
 await panelClient.send("Runtime.enable");
 await panelClient.send("Log.enable");
+await panelClient.send("Emulation.setDeviceMetricsOverride", { width: 430, height: 800, deviceScaleFactor: 1, mobile: false });
 await poll(() => evaluate(panelClient, "document.querySelector('#total-count')?.textContent"), (value) => value === "1");
 assert(await evaluate(panelClient, "document.querySelector('#total-count').textContent") === "1", "Queue Room rendered persisted state");
 
@@ -174,18 +177,91 @@ const shortResult = await evaluate(panelClient, `chrome.runtime.sendMessage({
 })`, true);
 assert(shortResult.ok && shortResult.kind === "short", "Queue Room accepted a Short without a new tab");
 
+const secondShortResult = await evaluate(panelClient, `chrome.runtime.sendMessage({
+  type: 'QUEUE_URL',
+  url: 'https://www.youtube.com/shorts/aqz-KE-bpKQ',
+  metadata: { title: 'QueueTube Later contract Short', channel: 'QueueTube QA', durationText: '0:24' }
+})`, true);
+assert(secondShortResult.ok && secondShortResult.kind === "short", "Second Short prepared the Later sequence");
+
+const firstExplicitVideo = await evaluate(panelClient, `chrome.runtime.sendMessage({
+  type: 'QUEUE_URL',
+  url: 'https://www.youtube.com/watch?v=ScMzIvxBSi4',
+  metadata: { title: 'QueueTube explicit video one', channel: 'QueueTube QA', durationText: '1:12' }
+})`, true);
+const secondExplicitVideo = await evaluate(panelClient, `chrome.runtime.sendMessage({
+  type: 'QUEUE_URL',
+  url: 'https://www.youtube.com/watch?v=ysz5S6PUM-U',
+  metadata: { title: 'QueueTube explicit video two', channel: 'QueueTube QA', durationText: '2:40' }
+})`, true);
+assert(firstExplicitVideo.ok && secondExplicitVideo.ok, "Multiple long videos stayed as lightweight records");
+
 const openShort = await evaluate(panelClient, `chrome.runtime.sendMessage({ type: 'OPEN_ITEM', itemId: ${JSON.stringify(shortResult.itemId)} })`, true);
 assert(openShort.ok && Number.isInteger(openShort.tabId), "Short opened in the controlled player");
 const firstPlayerTabId = openShort.tabId;
 
-const firstItem = capturedItems[0];
-const openVideo = await evaluate(panelClient, `chrome.runtime.sendMessage({ type: 'OPEN_ITEM', itemId: ${JSON.stringify(firstItem.id)} })`, true);
+const laterResult = await evaluate(panelClient, "chrome.runtime.sendMessage({ type: 'DEFER_CURRENT' })", true);
+assert(laterResult.ok && laterResult.deferred && laterResult.tabId === firstPlayerTabId, "Later reused the player and selected the following Short");
+const laterState = await evaluate(panelClient, "chrome.runtime.sendMessage({ type: 'GET_APP_STATE' })", true);
+const shortLaneAfterLater = laterState.items.filter((item) => item.kind === "short");
+assert(shortLaneAfterLater.at(-1).id === shortResult.itemId, "Later moved the current Short to its lane end");
+assert(laterState.session.currentItemId !== shortResult.itemId && laterState.session.status === "ready", "Later left the next pick ready and paused");
+
+const openVideo = await evaluate(panelClient, `chrome.runtime.sendMessage({ type: 'OPEN_ITEM', itemId: ${JSON.stringify(firstExplicitVideo.itemId)} })`, true);
 assert(openVideo.ok && openVideo.tabId === firstPlayerTabId, "Long video reused the same player tab");
+
+const batchResult = await evaluate(panelClient, `chrome.runtime.sendMessage({
+  type: 'BATCH_ITEMS',
+  itemIds: [${JSON.stringify(firstExplicitVideo.itemId)}, ${JSON.stringify(secondExplicitVideo.itemId)}],
+  action: 'top'
+})`, true);
+assert(batchResult.ok && batchResult.affected === 2, "Bulk queue action updated both selected videos");
+const batchState = await evaluate(panelClient, "chrome.runtime.sendMessage({ type: 'GET_APP_STATE' })", true);
+assert(batchState.items.filter((item) => item.kind === "video")[0].id === firstExplicitVideo.itemId, "Bulk move preserved selected video order");
+
+const badRestore = await evaluate(panelClient, "chrome.runtime.sendMessage({ type: 'RESTORE_BACKUP', payload: '{bad', mode: 'merge' })", true);
+assert(!badRestore.ok && badRestore.reason === "invalid-json", "Invalid backup was rejected without mutation");
+const restorePayload = JSON.stringify({ version: 3, items: [{ sourceUrl: "https://www.youtube.com/watch?v=M7lc1UVf-VE", title: "Restored QueueTube QA pick", kind: "video" }], history: [] });
+const restoreResult = await evaluate(panelClient, `chrome.runtime.sendMessage({ type: 'RESTORE_BACKUP', payload: ${JSON.stringify(restorePayload)}, mode: 'merge' })`, true);
+assert(restoreResult.ok && restoreResult.imported === 1, "v3 backup merged a validated queue record");
+
+const themeResult = await evaluate(panelClient, "chrome.runtime.sendMessage({ type: 'UPDATE_SETTINGS', patch: { theme: 'dark', compactDensity: true } })", true);
+assert(themeResult.ok && themeResult.settings.theme === "dark" && themeResult.settings.compactDensity, "Dark theme and compact density persisted");
+await poll(() => evaluate(panelClient, "document.documentElement.dataset.theme"), (value) => value === "dark");
+assert(await evaluate(panelClient, "document.body.classList.contains('compact')"), "Queue Room applied dark compact presentation live");
+const accessibilityAudit = await evaluate(panelClient, `(() => {
+  const visible = (element) => !element.hidden && element.getClientRects().length > 0;
+  const controls = [...document.querySelectorAll('button, input, select, textarea')].filter(visible);
+  const unnamed = controls.filter((control) => {
+    if (control.matches('input, select, textarea')) {
+      return !(control.getAttribute('aria-label') || control.labels?.length);
+    }
+    return !(control.getAttribute('aria-label') || control.textContent.trim() || control.getAttribute('title'));
+  });
+  return {
+    unnamed: unnamed.map((element) => element.outerHTML.slice(0, 120)),
+    overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    selectedTabs: document.querySelectorAll('[role="tab"][aria-selected="true"]').length,
+    liveRegions: document.querySelectorAll('[aria-live]').length
+  };
+})()`);
+assert(accessibilityAudit.unnamed.length === 0, "Visible Queue Room controls have accessible names", accessibilityAudit.unnamed.join(" | "));
+assert(!accessibilityAudit.overflow, "Queue Room has no horizontal overflow at panel width");
+assert(accessibilityAudit.selectedTabs === 1 && accessibilityAudit.liveRegions >= 1, "Tabs and live status expose accessible state");
+await panelClient.send("Emulation.setDeviceMetricsOverride", { width: 320, height: 800, deviceScaleFactor: 1, mobile: false });
+await evaluate(panelClient, "document.getElementById('toggle-select').click(); true", true);
+await poll(() => evaluate(panelClient, "document.body.classList.contains('is-selecting')"), Boolean);
+assert(!await evaluate(panelClient, "document.documentElement.scrollWidth > document.documentElement.clientWidth"), "Selection mode reflows at 320 CSS pixels");
+await evaluate(panelClient, "document.getElementById('cancel-select').click(); true", true);
+await panelClient.send("Emulation.setDeviceMetricsOverride", { width: 430, height: 800, deviceScaleFactor: 1, mobile: false });
+
+const commandsResult = await evaluate(panelClient, "chrome.runtime.sendMessage({ type: 'GET_COMMAND_STATE' })", true);
+assert(commandsResult.ok && commandsResult.commands.length >= 5, "Shortcut assignment status is available to the UI");
 
 const playerTarget = await poll(
   async () => (await getTargets()).find((target) => {
     if (target.type !== "page" || !target.url.includes("qt_queue=1")) return false;
-    return new URL(target.url).searchParams.get("qt_item") === firstItem.id;
+    return new URL(target.url).searchParams.get("qt_item") === firstExplicitVideo.itemId;
   }),
   Boolean,
   30_000
@@ -204,10 +280,24 @@ const playbackState = await poll(
 assert(playbackState.hasFocusShield, "Focus Shield applied on controlled playback");
 assert(playbackState.paused, "Controlled playback remained paused");
 
-const budgetResult = await evaluate(panelClient, "chrome.runtime.sendMessage({ type: 'SET_BUDGET', minutes: 10 })", true);
-assert(budgetResult.ok && budgetResult.session.budgetMinutes === 10, "Session budget persisted");
+await evaluate(playerClient, "document.querySelector('video').dispatchEvent(new Event('ended')); true");
+const advancedState = await poll(
+  () => evaluate(panelClient, "chrome.runtime.sendMessage({ type: 'GET_APP_STATE' })", true),
+  (value) => value?.session?.currentItemId === secondExplicitVideo.itemId && value.session.status === "ready",
+  30_000
+);
+assert(advancedState.session.playerTabId === firstPlayerTabId, "Natural video completion advanced in the same player tab");
+assert(advancedState.history.some((entry) => entry.id === firstExplicitVideo.itemId && entry.outcome === "watched"), "Natural completion recorded a watched outcome");
+await poll(
+  () => evaluate(playerClient, "document.querySelector('video')?.paused ?? null"),
+  (value) => value === true,
+  30_000
+);
+assert(true, "The next long video loaded paused after natural completion");
 
-await panelClient.send("Emulation.setDeviceMetricsOverride", { width: 430, height: 800, deviceScaleFactor: 1, mobile: false });
+const budgetResult = await evaluate(panelClient, "chrome.runtime.sendMessage({ type: 'SET_BUDGET', minutes: 45 })", true);
+assert(budgetResult.ok && budgetResult.session.budgetMinutes === 45, "Custom 45-minute session budget persisted");
+
 await sleep(600);
 const panelScreenshot = await panelClient.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
 await mkdir(artifactDirectory, { recursive: true });
