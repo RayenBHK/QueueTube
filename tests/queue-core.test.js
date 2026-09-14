@@ -2,22 +2,31 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  DEFAULT_SETTINGS,
   HISTORY_OUTCOMES,
+  PLAYBACK_STATES,
   QUEUE_KINDS,
+  SCHEMA_VERSION,
   addQueueItem,
   classifyYouTubeUrl,
+  createSession,
   createQueueItem,
+  deferQueueItem,
   formatDuration,
   getNextItem,
   historyEntry,
   isBudgetExpired,
+  migratePersistentState,
   normalizeQueueUrl,
   parseDurationText,
   queueKey,
   remainingBudgetMs,
   removeQueueItem,
   reorderQueueItem,
-  totalDurationSeconds
+  restoreBackupPayload,
+  sanitizeSettings,
+  totalDurationSeconds,
+  transitionSession
 } from "../src/queue-core.js";
 
 test("classifies Shorts, ordinary videos, live links, and shortened URLs", () => {
@@ -106,6 +115,18 @@ test("gives allowed duplicate picks independent controls", () => {
   assert.equal(removeQueueItem(second.items, second.item.id).length, 1);
 });
 
+test("moves a Later item to the end and selects the following item", () => {
+  const first = createQueueItem("https://www.youtube.com/watch?v=first");
+  const second = createQueueItem("https://www.youtube.com/watch?v=second");
+  const third = createQueueItem("https://www.youtube.com/watch?v=third");
+  const deferred = deferQueueItem([first, second, third], second.id);
+
+  assert.equal(deferred.moved, true);
+  assert.equal(deferred.nextItem.id, third.id);
+  assert.deepEqual(deferred.items.map((item) => item.id), [first.id, third.id, second.id]);
+  assert.equal(deferQueueItem([first], first.id).reason, "only-item");
+});
+
 test("calculates known queue time and enforces session budgets", () => {
   const first = createQueueItem("https://www.youtube.com/watch?v=a", { durationText: "2:00" });
   const second = createQueueItem("https://www.youtube.com/watch?v=b", { durationText: "3:30" });
@@ -120,6 +141,64 @@ test("records watched and skipped history outcomes", () => {
   assert.equal(historyEntry(item, HISTORY_OUTCOMES.WATCHED, 99).completedAt, 99);
   assert.equal(historyEntry(item, HISTORY_OUTCOMES.SKIPPED).outcome, "skipped");
   assert.equal(historyEntry(item, "unknown"), null);
+});
+
+test("sanitizes v3 settings and playback sessions", () => {
+  const settings = sanitizeSettings({ theme: "dark", compactDensity: true, captureMode: "invalid", defaultBudgetMinutes: 45 });
+  assert.equal(settings.theme, "dark");
+  assert.equal(settings.compactDensity, true);
+  assert.equal(settings.captureMode, DEFAULT_SETTINGS.captureMode);
+  assert.equal(settings.defaultBudgetMinutes, 45);
+
+  const session = createSession({ status: "playing", currentKind: "short", budgetMinutes: 999, playerTabId: 12 });
+  assert.equal(session.status, PLAYBACK_STATES.PLAYING);
+  assert.equal(session.currentKind, QUEUE_KINDS.SHORT);
+  assert.equal(session.budgetMinutes, 180);
+  assert.equal(session.playerTabId, 12);
+});
+
+test("allows valid session transitions and rejects stale ones", () => {
+  const loading = transitionSession(createSession(), PLAYBACK_STATES.LOADING, { currentItemId: "video:a" });
+  assert.equal(loading.ok, true);
+  assert.equal(loading.session.currentItemId, "video:a");
+  assert.equal(transitionSession(loading.session, PLAYBACK_STATES.PLAYING).reason, "invalid-transition");
+  const ready = transitionSession(loading.session, PLAYBACK_STATES.READY);
+  assert.equal(transitionSession(ready.session, PLAYBACK_STATES.PLAYING).ok, true);
+});
+
+test("migrates v2 queue data without losing valid picks", () => {
+  const item = createQueueItem("https://www.youtube.com/watch?v=migrate", { title: "Keep me" }, 10);
+  const migrated = migratePersistentState({
+    autoAdvanceShorts: true,
+    qtSettings: { theme: "dark", autoAdvanceShorts: false },
+    qtQueueItems: [item, { sourceUrl: "https://example.com/not-youtube" }],
+    qtHistory: [{ ...item, outcome: "watched", completedAt: 20 }]
+  });
+
+  assert.equal(migrated.schemaVersion, SCHEMA_VERSION);
+  assert.equal(migrated.settings.autoAdvanceShorts, false);
+  assert.equal(migrated.settings.theme, "dark");
+  assert.equal(migrated.items.length, 1);
+  assert.equal(migrated.items[0].title, "Keep me");
+  assert.equal(migrated.history.length, 1);
+  assert.equal(migrated.invalidItems, 1);
+});
+
+test("restores v2 and v3 backups without overwriting data on invalid input", () => {
+  const current = createQueueItem("https://www.youtube.com/watch?v=current");
+  const incoming = createQueueItem("https://www.youtube.com/shorts/incoming");
+  const merged = restoreBackupPayload({ version: 2, items: [current, incoming], history: [] }, [current], DEFAULT_SETTINGS, "merge");
+  assert.equal(merged.ok, true);
+  assert.equal(merged.items.length, 2);
+  assert.equal(merged.imported, 1);
+  assert.equal(merged.duplicates, 1);
+  const mergeSettings = restoreBackupPayload({ version: 3, settings: { theme: "dark" }, items: [] }, [current], { ...DEFAULT_SETTINGS, theme: "light" }, "merge");
+  assert.equal(mergeSettings.settings.theme, "light");
+  const replaceSettings = restoreBackupPayload({ version: 3, settings: { theme: "dark" }, items: [] }, [current], { ...DEFAULT_SETTINGS, theme: "light" }, "replace");
+  assert.equal(replaceSettings.settings.theme, "dark");
+  assert.equal(replaceSettings.items.length, 0);
+  assert.equal(restoreBackupPayload({ version: 1, items: [] }, [current], DEFAULT_SETTINGS).ok, false);
+  assert.equal(restoreBackupPayload({ version: 3, items: "bad" }, [current], DEFAULT_SETTINGS).reason, "invalid-items");
 });
 
 test("rejects lookalike and non-video URLs", () => {

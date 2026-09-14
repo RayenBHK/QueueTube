@@ -3,75 +3,90 @@
 
 # Queue YouTube picks without opening more tabs
 
-QueueTube turns Ctrl-click into a deliberate YouTube queue. Shorts and long videos stay organized as lightweight local records, then play in one reusable tab only when you choose them.
+QueueTube turns Ctrl-click into a deliberate YouTube queue. Shorts and long videos stay organized as lightweight local records, then move through one reusable player tab—paused until you choose to play.
 
-![QueueTube Queue Room](store-assets/screenshot-queue-room-1280x800.png)
+![QueueTube v0.3 Queue Room](store-assets/screenshot-queue-room-1280x800.png)
 
 ## What QueueTube changes
 
-QueueTube keeps your existing collection gesture and removes the expensive part: every selected video no longer needs its own YouTube page.
-
-- **Queue Room**: separates Shorts from long videos in a persistent side panel
-- **One-tab player**: reuses one YouTube tab across the queue
-- **Manual playback**: keeps queued and background media paused until you press play
-- **Zero-memory videos**: stores long videos as links until you select one
-- **Focused Shorts run**: converts Shorts to the regular player and loads the next pick without playing it
-- **Focus Shield**: hides related videos, comments, merchandise, and end cards on player pages
-- **Time budgets**: starts a 10, 20, or 30 minute viewing session
-- **Local history**: records watched and skipped picks on your device
-- **Classic tabs**: preserves the original grouped-tab workflow as an optional mode
+- **Separate lanes:** keeps Shorts and long videos ordered independently
+- **One-tab player:** reuses one YouTube page across the whole queue
+- **Reliable sequence:** Done, Skip, and natural completion load the next pick paused
+- **Later, not next:** `N` rotates the current pick to the end of its lane
+- **Zero-memory waiting:** stores long videos as links until selected
+- **Manual playback:** blocks queued and hidden media until you press play
+- **Now Playing:** shows state, lane position, next context, and recovery controls
+- **Focus Shield:** hides related videos, comments, merchandise, and end cards
+- **Time budgets:** supports 10, 20, 30, or any whole number up to 180 minutes
+- **Local tools:** bulk reorder/removal, filtered history, backup copy, and safe restore
+- **Themes:** follows the system by default, with fixed Light and Dark choices
+- **Classic tabs:** keeps the original grouped-tab workflow as an optional mode
 
 QueueTube has no server, account, analytics, ads, or external JavaScript.
 
-## Install the local build
+## Install or update the local build
 
-Use an unpacked extension while QueueTube is in development:
+For a first install:
 
-1. Download or clone this repository
-2. Open `chrome://extensions` in Chrome
-3. Turn on **Developer mode**
-4. Click **Load unpacked**
-5. Select the repository folder
-6. Refresh any YouTube tab that was already open
+1. Download or clone this repository.
+2. Open `chrome://extensions` in Chrome.
+3. Turn on **Developer mode**.
+4. Click **Load unpacked** and select the repository folder.
+5. Refresh YouTube tabs that were already open.
+
+After pulling a newer version, keep the same folder and click **Reload** on the QueueTube card. You do not need to load it again. Existing v0.2 queues, settings, history, and supported backups migrate automatically to schema 3.
 
 Chrome 116 or newer is required.
 
 ## Collect and watch picks
 
-Queue Room mode is enabled by default:
+1. Browse YouTube Home or Subscriptions.
+2. Ctrl-click, Command-click, or middle-click a video or Short.
+3. Open QueueTube and choose **Queue Room**.
+4. Start Shorts or Videos; QueueTube loads the first pick paused.
+5. Press play in YouTube, then move through the lane with the controls below.
 
-1. Browse YouTube Home or Subscriptions
-2. Ctrl-click, Command-click, or middle-click a video or Short
-3. Click the QueueTube toolbar button
-4. Click **Queue Room**
-5. Choose a pick, then press play in YouTube
+QueueTube marks queued thumbnails and blocks duplicates by default.
 
-QueueTube marks queued thumbnails on YouTube. It also blocks duplicate picks by default.
+### Player keys
 
-Inside a QueueTube player page, use these keys:
+| Key | Action |
+| --- | --- |
+| `W` | Mark Done and load the next pick paused |
+| `N` | Move the current pick to Later, then load the next paused |
+| `P` | Restore and load the previous watched or skipped pick |
+| `X` | Mark Skipped and load the next pick paused |
+| `?` | Show or hide the keyboard guide |
 
-- `N`: load the next pick without recording an outcome
-- `P`: restore and open the latest history item
-- `X`: skip the current pick and load the next one
+These keys do not run while you are typing in a field. YouTube's Space and `K` play/pause keys still work.
 
-Chrome-wide shortcuts are available at `chrome://extensions/shortcuts`:
+### Chrome-wide shortcuts
+
+Open **Controls & protection → Keyboard setup** to see which shortcuts Chrome actually assigned. QueueTube suggests:
 
 - `Alt+Shift+Q`: open the Queue Room
-- `Alt+Shift+S`: open the next Short
-- `Alt+Shift+V`: open the next long video
+- `Alt+Shift+S`: start or continue Shorts
+- `Alt+Shift+V`: start or continue long videos
 - `Alt+Shift+X`: skip the current pick
 
-## Gather existing YouTube tabs
+Chrome may leave suggested shortcuts unassigned. Use QueueTube's **Open Chrome shortcut settings** action or visit `chrome://extensions/shortcuts`.
 
-Open **Queue tools**, then click **Import open tabs**. You can keep the original tabs or close only the tabs that QueueTube imports.
+## Manage a larger queue
+
+- Use **Select picks** for bulk Move top, Move bottom, or Remove.
+- Use **Import open tabs** to gather existing YouTube tabs and optionally close only the imported originals.
+- Use **Copy backup** for portable v3 JSON.
+- Use **Restore backup** to merge into the current queue or deliberately replace it. v2 and v3 backups are validated before storage.
+- Filter History by outcome or lane, then restore individual picks.
+- Enable **Compact density** to fit more picks in a narrow panel.
 
 ## Use Classic tabs
 
-Open **Controls & protection**, then change **Collecting mode** to **Classic tabs**. Shorts open in an orange tab group. Long videos open in a collapsed blue group and become discardable while inactive.
+Open **Controls & protection**, then change **Collecting mode** to **Classic tabs**. Shorts open in an orange tab group. Long videos open in a collapsed blue group and become discardable while inactive. v0.3 preserves this compatibility mode; new sequence features belong to Queue Room mode.
 
 ## Develop and verify QueueTube
 
-QueueTube uses browser-native JavaScript and has no runtime dependencies. Run the release checks with Node.js 22 or newer:
+QueueTube uses browser-native JavaScript and has no runtime dependencies. With Node.js 22 or newer:
 
 ```powershell
 node tools/check-extension.mjs
@@ -83,13 +98,13 @@ Build the Chrome Web Store ZIP on Windows:
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/package-extension.ps1
 ```
 
-Read [how to test QueueTube](docs/TESTING.md), [how QueueTube works](ARCHITECTURE.md), [QueueTube's accessibility support](docs/ACCESSIBILITY.md), and [how to contribute](CONTRIBUTING.md).
+Read [the completed v0.3 roadmap](docs/ROADMAP-v0.3.md), [the test guide](docs/TESTING.md), [the architecture reference](ARCHITECTURE.md), [accessibility support](docs/ACCESSIBILITY.md), and [the contribution guide](CONTRIBUTING.md).
 
 ## Privacy and support
 
-Queue data, settings, session budgets, and QueueTube history stay in local Chrome extension storage. Read the [privacy policy](PRIVACY.md) and report defects through [GitHub Issues](https://github.com/RayenBHK/QueueTube/issues).
+Queue data, settings, budgets, and QueueTube history stay in local Chrome extension storage. Read the [privacy policy](PRIVACY.md) and report defects through [GitHub Issues](https://github.com/RayenBHK/QueueTube/issues).
 
-QueueTube is an independent project. It is not affiliated with or endorsed by YouTube or Google.
+QueueTube is independent and is not affiliated with or endorsed by YouTube or Google.
 
 ## License
 

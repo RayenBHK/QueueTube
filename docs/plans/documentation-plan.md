@@ -17,6 +17,7 @@ The primary audience wants a calmer YouTube workflow and may not write code. Con
 | Page | Type | Job |
 | --- | --- | --- |
 | `README.md` | Landing | Explain the product and route readers to the right task |
+| `docs/ROADMAP-v0.3.md` | Planning | Define v0.3.0 scope, decisions, sequencing, gates, risks, and request intake |
 | `docs/TESTING.md` | How-to | Verify one release from logic through browser behavior |
 | `docs/ACCESSIBILITY.md` | Reference | Describe keyboard, screen-reader, visual, and verification support |
 | `CONTRIBUTING.md` | How-to | Prepare and submit a safe code change |

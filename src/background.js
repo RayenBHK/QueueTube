@@ -1,25 +1,36 @@
 import {
   CAPTURE_MODES,
+  DEFAULT_SESSION,
   DEFAULT_SETTINGS,
   HISTORY_OUTCOMES,
+  PLAYBACK_STATES,
   QUEUE_GROUPS,
   QUEUE_KINDS,
+  SCHEMA_VERSION,
+  THEMES,
   addQueueItem,
+  createSession,
   createQueueItem,
+  deferQueueItem,
   getLane,
   getNextItem,
   historyEntry,
   isBudgetExpired,
+  migratePersistentState,
   normalizeQueueUrl,
   queueKey,
   removeQueueItem,
-  reorderQueueItem
+  reorderQueueItem,
+  restoreBackupPayload,
+  sanitizeSettings,
+  transitionSession
 } from "./queue-core.js";
 
 const STORAGE_KEYS = Object.freeze({
   SETTINGS: "qtSettings",
   ITEMS: "qtQueueItems",
-  HISTORY: "qtHistory"
+  HISTORY: "qtHistory",
+  SCHEMA: "qtSchemaVersion"
 });
 
 const SESSION_KEY = "qtSession";
@@ -27,6 +38,10 @@ const HISTORY_LIMIT = 200;
 
 async function withQueueLock(operation) {
   return navigator.locks.request("queuetube:queue-write", { mode: "exclusive" }, operation);
+}
+
+async function withPlayerLock(operation) {
+  return navigator.locks.request("queuetube:player-transition", { mode: "exclusive" }, operation);
 }
 
 function isYouTubeUrl(rawUrl) {
@@ -47,7 +62,7 @@ function isTrustedSender(sender) {
 
 async function getSettings() {
   const stored = await chrome.storage.local.get({ [STORAGE_KEYS.SETTINGS]: DEFAULT_SETTINGS });
-  return { ...DEFAULT_SETTINGS, ...stored[STORAGE_KEYS.SETTINGS] };
+  return sanitizeSettings(stored[STORAGE_KEYS.SETTINGS]);
 }
 
 async function setSettings(patch) {
@@ -56,11 +71,12 @@ async function setSettings(patch) {
     Object.entries(patch || {}).filter(([key, value]) => {
       if (!allowedKeys.has(key)) return false;
       if (key === "captureMode") return Object.values(CAPTURE_MODES).includes(value);
-      if (key === "defaultBudgetMinutes") return [0, 10, 20, 30].includes(value);
+      if (key === "theme") return Object.values(THEMES).includes(value);
+      if (key === "defaultBudgetMinutes") return Number.isInteger(value) && value >= 0 && value <= 180;
       return typeof value === typeof DEFAULT_SETTINGS[key];
     })
   );
-  const next = { ...(await getSettings()), ...safePatch };
+  const next = sanitizeSettings({ ...(await getSettings()), ...safePatch });
   await chrome.storage.local.set({ [STORAGE_KEYS.SETTINGS]: next });
   return next;
 }
@@ -80,22 +96,22 @@ async function getHistory() {
 }
 
 async function getSession() {
-  const stored = await chrome.storage.session.get({
-    [SESSION_KEY]: {
-      playerTabId: null,
-      currentItemId: null,
-      currentKind: null,
-      budgetMinutes: 0,
-      startedAt: null
-    }
-  });
-  return stored[SESSION_KEY];
+  const stored = await chrome.storage.session.get({ [SESSION_KEY]: DEFAULT_SESSION });
+  return createSession(stored[SESSION_KEY]);
 }
 
 async function setSession(patch) {
-  const next = { ...(await getSession()), ...patch };
+  const next = createSession({ ...(await getSession()), ...patch });
   await chrome.storage.session.set({ [SESSION_KEY]: next });
   return next;
+}
+
+async function setSessionState(status, patch = {}) {
+  const current = await getSession();
+  const transitioned = transitionSession(current, status, patch);
+  if (!transitioned.ok) throw new Error(`${transitioned.reason}:${current.status}->${status}`);
+  await chrome.storage.session.set({ [SESSION_KEY]: transitioned.session });
+  return transitioned.session;
 }
 
 async function getTargetWindowId(preferredWindowId) {
@@ -278,30 +294,71 @@ async function validPlayerTab(session) {
   }
 }
 
-async function openPlaybackItem(item, preferredWindowId) {
+function nextTransitionToken() {
+  return crypto.randomUUID();
+}
+
+function playbackUrlFor(item, transitionToken) {
+  const url = new URL(item.playbackUrl);
+  url.searchParams.set("qt_item", item.id);
+  url.searchParams.set("qt_transition", transitionToken);
+  return url.href;
+}
+
+async function openPlaybackItemUnlocked(item, preferredWindowId) {
   if (!item) return { ok: false, reason: "missing-item" };
   const session = await getSession();
-  if (isBudgetExpired(session)) return { ok: false, reason: "budget-finished" };
-
-  const windowId = await getTargetWindowId(preferredWindowId);
-  const playerTab = await validPlayerTab(session);
-  let tab;
-  if (playerTab) {
-    tab = await chrome.tabs.update(playerTab.id, { url: item.playbackUrl, active: true });
-    if (playerTab.windowId !== windowId) {
-      await chrome.windows.update(playerTab.windowId, { focused: true });
-    }
-  } else {
-    tab = await chrome.tabs.create({ windowId, url: item.playbackUrl, active: true });
+  if (isBudgetExpired(session)) {
+    const nextSession = await setSession({ status: PLAYBACK_STATES.BUDGET_COMPLETE, lastError: null });
+    return { ok: false, reason: "budget-finished", session: nextSession };
   }
 
-  await setSession({ playerTabId: tab.id, currentItemId: item.id, currentKind: item.kind });
-  return { ok: true, tabId: tab.id, itemId: item.id, kind: item.kind };
+  const transitionToken = nextTransitionToken();
+  const sessionId = session.sessionId || crypto.randomUUID();
+  await setSessionState(PLAYBACK_STATES.LOADING, {
+    currentItemId: item.id,
+    currentKind: item.kind,
+    completedLane: null,
+    sessionId,
+    transitionToken,
+    lastError: null
+  });
+
+  try {
+    const windowId = await getTargetWindowId(preferredWindowId);
+    const playerTab = await validPlayerTab(session);
+    const url = playbackUrlFor(item, transitionToken);
+    let tab;
+    if (playerTab) {
+      tab = await chrome.tabs.update(playerTab.id, { url, active: true });
+      if (playerTab.windowId !== windowId) {
+        await chrome.windows.update(playerTab.windowId, { focused: true });
+      }
+    } else {
+      tab = await chrome.tabs.create({ windowId, url, active: true });
+    }
+
+    const readySession = await setSessionState(PLAYBACK_STATES.READY, { playerTabId: tab.id });
+    return {
+      ok: true,
+      tabId: tab.id,
+      itemId: item.id,
+      kind: item.kind,
+      transitionToken,
+      session: readySession
+    };
+  } catch (error) {
+    const message = String(error?.message || "player-navigation-failed").slice(0, 300);
+    const failedSession = await setSessionState(PLAYBACK_STATES.ERROR, { lastError: message });
+    return { ok: false, reason: "player-navigation-failed", session: failedSession };
+  }
 }
 
 async function openItem(itemId, preferredWindowId) {
-  const item = (await getItems()).find((entry) => entry.id === itemId);
-  return openPlaybackItem(item, preferredWindowId);
+  return withPlayerLock(async () => {
+    const item = (await getItems()).find((entry) => entry.id === itemId);
+    return openPlaybackItemUnlocked(item, preferredWindowId);
+  });
 }
 
 async function openNextClassic(kind, preferredWindowId) {
@@ -315,30 +372,35 @@ async function openNextClassic(kind, preferredWindowId) {
   return { ok: true, tabId: ordered[0].id, kind, mode: CAPTURE_MODES.CLASSIC_TABS };
 }
 
+async function openNextQueueRoomUnlocked(kind, preferredWindowId) {
+  if (!Object.values(QUEUE_KINDS).includes(kind)) return { ok: false, reason: "empty" };
+  const [items, session] = await Promise.all([getItems(), getSession()]);
+  const currentId = session.currentKind === kind ? session.currentItemId : null;
+  const item = getNextItem(items, kind, currentId);
+  return openPlaybackItemUnlocked(item, preferredWindowId);
+}
+
 async function openNext(kind, preferredWindowId) {
   const settings = await getSettings();
   if (settings.captureMode === CAPTURE_MODES.CLASSIC_TABS) {
     return openNextClassic(kind, preferredWindowId);
   }
-  const [items, session] = await Promise.all([getItems(), getSession()]);
-  const currentId = session.currentKind === kind ? session.currentItemId : null;
-  const item = getNextItem(items, kind, currentId);
-  return openPlaybackItem(item, preferredWindowId);
+  return withPlayerLock(() => openNextQueueRoomUnlocked(kind, preferredWindowId));
 }
 
-async function recordOutcome(itemId, outcome) {
+async function recordOutcome(itemId, outcome, sessionId = null) {
   const result = await withQueueLock(async () => {
     const [items, history, settings] = await Promise.all([getItems(), getHistory(), getSettings()]);
     const item = items.find((entry) => entry.id === itemId);
     if (!item) return { ok: false, reason: "missing-item" };
 
-    const entry = historyEntry(item, outcome);
+    const baseEntry = historyEntry(item, outcome);
+    const entry = baseEntry ? { ...baseEntry, sessionId } : null;
     const nextHistory = entry ? [entry, ...history].slice(0, HISTORY_LIMIT) : history;
     const nextItems = settings.removeFinished ? removeQueueItem(items, itemId) : items;
     await Promise.all([
       setItems(nextItems),
-      chrome.storage.local.set({ [STORAGE_KEYS.HISTORY]: nextHistory }),
-      setSession({ currentItemId: null, currentKind: null })
+      chrome.storage.local.set({ [STORAGE_KEYS.HISTORY]: nextHistory })
     ]);
     return { ok: true, item, items: nextItems, settings };
   });
@@ -346,41 +408,179 @@ async function recordOutcome(itemId, outcome) {
   return result;
 }
 
-async function finishCurrent(outcome, preferredWindowId, { advance = true } = {}) {
+async function finishCurrentUnlocked(outcome, preferredWindowId, { advance = true, expectedItemId = null, transitionToken = null } = {}) {
   const session = await getSession();
   if (!session.currentItemId) return { ok: false, reason: "no-current-item" };
-  const result = await recordOutcome(session.currentItemId, outcome);
-  if (!result.ok || !advance) return result;
+  if (expectedItemId && expectedItemId !== session.currentItemId) return { ok: false, reason: "stale-player" };
+  if (transitionToken && transitionToken !== session.transitionToken) return { ok: false, reason: "stale-player" };
+
+  await setSessionState(PLAYBACK_STATES.ADVANCING);
+  const result = await recordOutcome(session.currentItemId, outcome, session.sessionId);
+  if (!result.ok) {
+    await setSession({ status: PLAYBACK_STATES.ERROR, lastError: result.reason });
+    return result;
+  }
+  if (!advance) {
+    const nextSession = await setSession({
+      status: PLAYBACK_STATES.IDLE,
+      currentItemId: null,
+      currentKind: null,
+      completedLane: null,
+      transitionToken: null,
+      lastError: null
+    });
+    return { ...result, session: nextSession };
+  }
 
   const next = getNextItem(
     result.items,
     result.item.kind,
     result.settings.removeFinished ? null : result.item.id
   );
-  if (!next) return { ok: true, finished: true, queueEnded: true };
-  const opened = await openPlaybackItem(next, preferredWindowId);
+  if (!next) {
+    const nextSession = await setSessionState(PLAYBACK_STATES.LANE_COMPLETE, {
+      currentItemId: null,
+      currentKind: null,
+      completedLane: result.item.kind,
+      transitionToken: null,
+      lastError: null
+    });
+    return { ok: true, finished: true, queueEnded: true, completedLane: result.item.kind, session: nextSession };
+  }
+  const opened = await openPlaybackItemUnlocked(next, preferredWindowId);
   return { ...opened, finished: true };
 }
 
-async function handlePlayerEnded(sender) {
-  const [session, settings] = await Promise.all([getSession(), getSettings()]);
-  if (sender.tab?.id !== session.playerTabId || !session.currentItemId) {
-    return { ok: false, reason: "not-current-player" };
-  }
-  const shouldAdvance = session.currentKind === QUEUE_KINDS.SHORT && settings.autoAdvanceShorts;
-  return finishCurrent(HISTORY_OUTCOMES.WATCHED, sender.tab.windowId, { advance: shouldAdvance });
+async function finishCurrent(outcome, preferredWindowId, options = {}) {
+  return withPlayerLock(() => finishCurrentUnlocked(outcome, preferredWindowId, options));
+}
+
+async function handlePlayerEnded(message, sender) {
+  return withPlayerLock(async () => {
+    const [session, settings] = await Promise.all([getSession(), getSettings()]);
+    if (sender.tab?.id !== session.playerTabId || !session.currentItemId) {
+      return { ok: false, reason: "not-current-player" };
+    }
+    const shouldAdvance = session.currentKind === QUEUE_KINDS.SHORT
+      ? settings.autoAdvanceShorts
+      : settings.autoAdvanceVideos;
+    return finishCurrentUnlocked(HISTORY_OUTCOMES.WATCHED, sender.tab.windowId, {
+      advance: shouldAdvance,
+      expectedItemId: message.itemId,
+      transitionToken: message.transitionToken
+    });
+  });
+}
+
+async function deferCurrent(preferredWindowId) {
+  return withPlayerLock(async () => {
+    const session = await getSession();
+    if (!session.currentItemId) return { ok: false, reason: "no-current-item" };
+    const deferred = await withQueueLock(async () => {
+      const result = deferQueueItem(await getItems(), session.currentItemId);
+      if (result.moved) await setItems(result.items);
+      return result;
+    });
+    if (!deferred.moved) return { ok: false, reason: deferred.reason };
+    await setSessionState(PLAYBACK_STATES.ADVANCING);
+    await updateBadge();
+    const opened = await openPlaybackItemUnlocked(deferred.nextItem, preferredWindowId);
+    return { ...opened, deferred: true };
+  });
 }
 
 async function openPrevious(preferredWindowId) {
-  const history = await getHistory();
-  const previous = history[0];
-  if (!previous) return { ok: false, reason: "no-history" };
+  return withPlayerLock(async () => {
+    const result = await withQueueLock(async () => {
+      const [history, settings, items] = await Promise.all([getHistory(), getSettings(), getItems()]);
+      const previous = history[0];
+      if (!previous) return { ok: false, reason: "no-history" };
 
-  const settings = await getSettings();
-  const restored = createQueueItem(previous.sourceUrl, previous, Date.now(), settings);
-  const result = addQueueItem(await getItems(), restored, { preventDuplicates: true });
-  if (result.added) await setItems(result.items);
-  return openPlaybackItem(result.item, preferredWindowId);
+      const restored = createQueueItem(previous.sourceUrl, previous, Date.now(), settings);
+      const added = addQueueItem(items, restored, { preventDuplicates: true });
+      await Promise.all([
+        added.added ? setItems(added.items) : Promise.resolve(),
+        chrome.storage.local.set({ [STORAGE_KEYS.HISTORY]: history.slice(1) })
+      ]);
+      return { ok: true, item: added.item };
+    });
+    if (!result.ok) return result;
+    await updateBadge();
+    return openPlaybackItemUnlocked(result.item, preferredWindowId);
+  });
+}
+
+async function focusPlayer() {
+  const session = await getSession();
+  const tab = await validPlayerTab(session);
+  if (!tab) return { ok: false, reason: "no-player" };
+  await chrome.tabs.update(tab.id, { active: true });
+  await chrome.windows.update(tab.windowId, { focused: true });
+  return { ok: true, tabId: tab.id };
+}
+
+async function updatePlayerState(message, sender) {
+  return withPlayerLock(async () => {
+    const session = await getSession();
+    if (
+      sender.tab?.id !== session.playerTabId ||
+      message.itemId !== session.currentItemId ||
+      message.transitionToken !== session.transitionToken
+    ) {
+      return { ok: false, reason: "stale-player", shouldPause: true };
+    }
+    if (isBudgetExpired(session)) {
+      const nextSession = await setSession({ status: PLAYBACK_STATES.BUDGET_COMPLETE });
+      return { ok: true, shouldPause: true, session: nextSession };
+    }
+
+    const nextStatus = message.state === "playing" ? PLAYBACK_STATES.PLAYING : PLAYBACK_STATES.READY;
+    const transitioned = transitionSession(session, nextStatus);
+    if (!transitioned.ok) return { ok: false, reason: transitioned.reason, shouldPause: session.status !== PLAYBACK_STATES.PLAYING };
+    await chrome.storage.session.set({ [SESSION_KEY]: transitioned.session });
+    return { ok: true, shouldPause: false, session: transitioned.session };
+  });
+}
+
+async function getPlayerPolicy(message, sender) {
+  const session = await getSession();
+  const current = sender.tab?.id === session.playerTabId &&
+    message.itemId === session.currentItemId &&
+    message.transitionToken === session.transitionToken;
+  const budgetExpired = current && isBudgetExpired(session);
+  if (budgetExpired && session.status !== PLAYBACK_STATES.BUDGET_COMPLETE) {
+    await setSession({ status: PLAYBACK_STATES.BUDGET_COMPLETE });
+  }
+  return { ok: true, current, shouldPause: !current || budgetExpired, budgetExpired, session: await getSession() };
+}
+
+async function openShortcutSettings() {
+  try {
+    const tab = await chrome.tabs.create({ url: "chrome://extensions/shortcuts", active: true });
+    return { ok: true, tabId: tab.id };
+  } catch {
+    return { ok: false, reason: "shortcut-settings-unavailable" };
+  }
+}
+
+async function getCommandState() {
+  const recommended = {
+    "open-queue-room": "Alt+Shift+Q",
+    "open-next-short": "Alt+Shift+S",
+    "open-next-video": "Alt+Shift+V",
+    "skip-current": "Alt+Shift+X"
+  };
+  const commands = await chrome.commands.getAll();
+  return {
+    ok: true,
+    schemaVersion: SCHEMA_VERSION,
+    commands: commands.map((command) => ({
+      name: command.name,
+      description: command.description || (command.name === "_execute_action" ? "Activate the extension" : command.name),
+      shortcut: command.shortcut || "",
+      recommended: recommended[command.name] || ""
+    }))
+  };
 }
 
 async function moveItem(itemId, targetIndex) {
@@ -403,7 +603,14 @@ async function removeItem(itemId) {
   if (!result.ok) return result;
   const session = await getSession();
   if (session.currentItemId === itemId) {
-    await setSession({ currentItemId: null, currentKind: null });
+    await setSession({
+      status: PLAYBACK_STATES.IDLE,
+      currentItemId: null,
+      currentKind: null,
+      completedLane: null,
+      transitionToken: null,
+      lastError: null
+    });
   }
   await updateBadge();
   return { ok: true };
@@ -416,7 +623,17 @@ async function clearQueue(kind = null) {
     await setItems(next);
     return items.length - next.length;
   });
-  await setSession({ currentItemId: null, currentKind: null });
+  const session = await getSession();
+  if (!kind || session.currentKind === kind) {
+    await setSession({
+      status: PLAYBACK_STATES.IDLE,
+      currentItemId: null,
+      currentKind: null,
+      completedLane: null,
+      transitionToken: null,
+      lastError: null
+    });
+  }
   await updateBadge();
   return { ok: true, removed };
 }
@@ -427,12 +644,137 @@ async function clearHistory() {
 }
 
 async function setBudget(minutes) {
-  const budgetMinutes = [0, 10, 20, 30].includes(Number(minutes)) ? Number(minutes) : 0;
+  const numericMinutes = Number(minutes);
+  if (!Number.isInteger(numericMinutes) || numericMinutes < 0 || numericMinutes > 180) {
+    return { ok: false, reason: "invalid-budget" };
+  }
+  const budgetMinutes = numericMinutes;
+  const current = await getSession();
+  const status = current.status === PLAYBACK_STATES.BUDGET_COMPLETE
+    ? (current.currentItemId ? PLAYBACK_STATES.READY : PLAYBACK_STATES.IDLE)
+    : current.status;
   const session = await setSession({
+    status,
     budgetMinutes,
-    startedAt: budgetMinutes ? Date.now() : null
+    startedAt: budgetMinutes ? Date.now() : null,
+    lastError: null
   });
   return { ok: true, session };
+}
+
+async function batchItems(itemIds, action) {
+  const ids = [...new Set(Array.isArray(itemIds) ? itemIds.filter((id) => typeof id === "string") : [])];
+  if (!ids.length || ids.length > 500 || !["remove", "top", "bottom"].includes(action)) {
+    return { ok: false, reason: "invalid-batch" };
+  }
+
+  const selected = new Set(ids);
+  const result = await withQueueLock(async () => {
+    const items = await getItems();
+    const found = items.filter((item) => selected.has(item.id));
+    if (!found.length) return { ok: false, reason: "missing-items" };
+
+    let next;
+    if (action === "remove") {
+      next = items.filter((item) => !selected.has(item.id));
+    } else {
+      const reorderLane = (kind) => {
+        const lane = getLane(items, kind);
+        const chosen = lane.filter((item) => selected.has(item.id));
+        const rest = lane.filter((item) => !selected.has(item.id));
+        return action === "top" ? [...chosen, ...rest] : [...rest, ...chosen];
+      };
+      next = [
+        ...reorderLane(QUEUE_KINDS.SHORT),
+        ...reorderLane(QUEUE_KINDS.VIDEO)
+      ];
+    }
+    await setItems(next);
+    return { ok: true, affected: found.length, items: next };
+  });
+
+  if (!result.ok) return result;
+  if (action === "remove") {
+    const session = await getSession();
+    if (selected.has(session.currentItemId)) {
+      await setSession({
+        status: PLAYBACK_STATES.IDLE,
+        currentItemId: null,
+        currentKind: null,
+        completedLane: null,
+        transitionToken: null,
+        lastError: null
+      });
+    }
+  }
+  await updateBadge();
+  return result;
+}
+
+async function restoreBackup(rawPayload, mode = "merge") {
+  if (typeof rawPayload !== "string" || rawPayload.length > 1_000_000) {
+    return { ok: false, reason: "invalid-backup" };
+  }
+  let payload;
+  try {
+    payload = JSON.parse(rawPayload);
+  } catch {
+    return { ok: false, reason: "invalid-json" };
+  }
+
+  const [currentItems, currentSettings, currentHistory] = await Promise.all([
+    getItems(),
+    getSettings(),
+    getHistory()
+  ]);
+  const restored = restoreBackupPayload(payload, currentItems, currentSettings, mode);
+  if (!restored.ok) return restored;
+
+  const history = restored.mode === "replace"
+    ? restored.history
+    : [...restored.history, ...currentHistory]
+      .filter((entry, index, entries) => entries.findIndex((candidate) => (
+        candidate.id === entry.id && candidate.completedAt === entry.completedAt
+      )) === index)
+      .slice(0, HISTORY_LIMIT);
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.SCHEMA]: SCHEMA_VERSION,
+    [STORAGE_KEYS.SETTINGS]: restored.settings,
+    [STORAGE_KEYS.ITEMS]: restored.items,
+    [STORAGE_KEYS.HISTORY]: history
+  });
+  if (restored.mode === "replace") {
+    await setSession({
+      status: PLAYBACK_STATES.IDLE,
+      currentItemId: null,
+      currentKind: null,
+      completedLane: null,
+      transitionToken: null,
+      lastError: null
+    });
+  }
+  await updateBadge();
+  return { ...restored, history };
+}
+
+async function restoreHistoryItem(historyId) {
+  if (typeof historyId !== "string") return { ok: false, reason: "invalid-history-item" };
+  const result = await withQueueLock(async () => {
+    const [history, items, settings] = await Promise.all([getHistory(), getItems(), getSettings()]);
+    const index = history.findIndex((entry) => `${entry.id}:${entry.completedAt}` === historyId);
+    if (index < 0) return { ok: false, reason: "missing-history-item" };
+    const entry = history[index];
+    const item = createQueueItem(entry.sourceUrl, entry, Date.now(), settings);
+    const added = addQueueItem(items, item, settings);
+    const nextHistory = history.filter((_, candidateIndex) => candidateIndex !== index);
+    await Promise.all([
+      added.added ? setItems(added.items) : Promise.resolve(),
+      chrome.storage.local.set({ [STORAGE_KEYS.HISTORY]: nextHistory })
+    ]);
+    return { ok: true, duplicate: !added.added, item: added.item };
+  });
+  await updateBadge();
+  return result;
 }
 
 async function importYouTubeTabs(preferredWindowId, closeOriginals = false) {
@@ -501,19 +843,18 @@ async function updateBadge() {
 
 async function migrateAndInitialize() {
   const existing = await chrome.storage.local.get(null);
-  const legacy = Object.fromEntries(
-    Object.keys(DEFAULT_SETTINGS)
-      .filter((key) => existing[key] !== undefined)
-      .map((key) => [key, existing[key]])
-  );
-  const settings = { ...DEFAULT_SETTINGS, ...(existing[STORAGE_KEYS.SETTINGS] || {}), ...legacy };
+  const migrated = migratePersistentState(existing);
   await chrome.storage.local.set({
-    [STORAGE_KEYS.SETTINGS]: settings,
-    [STORAGE_KEYS.ITEMS]: Array.isArray(existing[STORAGE_KEYS.ITEMS]) ? existing[STORAGE_KEYS.ITEMS] : [],
-    [STORAGE_KEYS.HISTORY]: Array.isArray(existing[STORAGE_KEYS.HISTORY]) ? existing[STORAGE_KEYS.HISTORY] : []
+    [STORAGE_KEYS.SCHEMA]: migrated.schemaVersion,
+    [STORAGE_KEYS.SETTINGS]: migrated.settings,
+    [STORAGE_KEYS.ITEMS]: migrated.items,
+    [STORAGE_KEYS.HISTORY]: migrated.history
   });
-  if (!existing[SESSION_KEY]) {
-    await setSession({ budgetMinutes: settings.defaultBudgetMinutes, startedAt: null });
+  const sessionStore = await chrome.storage.session.get(SESSION_KEY);
+  if (!sessionStore[SESSION_KEY]) {
+    await setSession({ budgetMinutes: migrated.settings.defaultBudgetMinutes, startedAt: null });
+  } else {
+    await chrome.storage.session.set({ [SESSION_KEY]: createSession(sessionStore[SESSION_KEY]) });
   }
   await updateBadge();
 }
@@ -574,24 +915,43 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case "OPEN_NEXT":
       return respondAsync(sendResponse, () => openNext(message.kind, message.windowId));
     case "NEXT_ITEM":
-      return respondAsync(sendResponse, async () => {
-        const session = await getSession();
-        return openNext(session.currentKind, message.windowId || sender.tab?.windowId);
-      });
+    case "DEFER_CURRENT":
+      return respondAsync(sendResponse, () => deferCurrent(message.windowId || sender.tab?.windowId));
     case "PREVIOUS_ITEM":
       return respondAsync(sendResponse, () => openPrevious(message.windowId || sender.tab?.windowId));
     case "SKIP_CURRENT":
       return respondAsync(sendResponse, () => finishCurrent(HISTORY_OUTCOMES.SKIPPED, message.windowId || sender.tab?.windowId));
+    case "FINISH_CURRENT":
+      return respondAsync(sendResponse, () => finishCurrent(
+        message.outcome === HISTORY_OUTCOMES.SKIPPED ? HISTORY_OUTCOMES.SKIPPED : HISTORY_OUTCOMES.WATCHED,
+        message.windowId || sender.tab?.windowId
+      ));
     case "PLAYER_ENDED":
-      return respondAsync(sendResponse, () => handlePlayerEnded(sender));
+      return respondAsync(sendResponse, () => handlePlayerEnded(message, sender));
+    case "PLAYER_STATE":
+      return respondAsync(sendResponse, () => updatePlayerState(message, sender));
+    case "GET_PLAYER_POLICY":
+      return respondAsync(sendResponse, () => getPlayerPolicy(message, sender));
+    case "FOCUS_PLAYER":
+      return respondAsync(sendResponse, focusPlayer);
+    case "GET_COMMAND_STATE":
+      return respondAsync(sendResponse, getCommandState);
+    case "OPEN_SHORTCUT_SETTINGS":
+      return respondAsync(sendResponse, openShortcutSettings);
     case "MOVE_ITEM":
       return respondAsync(sendResponse, () => moveItem(message.itemId, message.targetIndex));
     case "REMOVE_ITEM":
       return respondAsync(sendResponse, () => removeItem(message.itemId));
+    case "BATCH_ITEMS":
+      return respondAsync(sendResponse, () => batchItems(message.itemIds, message.action));
     case "CLEAR_QUEUE":
       return respondAsync(sendResponse, () => clearQueue(message.kind));
     case "CLEAR_HISTORY":
       return respondAsync(sendResponse, clearHistory);
+    case "RESTORE_HISTORY_ITEM":
+      return respondAsync(sendResponse, () => restoreHistoryItem(message.historyId));
+    case "RESTORE_BACKUP":
+      return respondAsync(sendResponse, () => restoreBackup(message.payload, message.mode));
     case "SET_BUDGET":
       return respondAsync(sendResponse, () => setBudget(message.minutes));
     case "UPDATE_SETTINGS":
@@ -642,7 +1002,15 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   void runSafely("tab removal", async () => {
     const session = await getSession();
     if (session.playerTabId === tabId) {
-      await setSession({ playerTabId: null, currentItemId: null, currentKind: null });
+      await setSession({
+        status: PLAYBACK_STATES.IDLE,
+        playerTabId: null,
+        currentItemId: null,
+        currentKind: null,
+        completedLane: null,
+        transitionToken: null,
+        lastError: null
+      });
     }
     await updateBadge();
   });
