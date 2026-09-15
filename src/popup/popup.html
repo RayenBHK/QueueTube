@@ -6,32 +6,48 @@
     <title>QueueTube</title>
     <script src="../theme-init.js"></script>
     <link rel="stylesheet" href="popup.css">
+    <link rel="stylesheet" href="../settings-ui.css">
   </head>
   <body>
-    <main class="shell">
-      <header class="masthead">
-        <div class="brand-mark" aria-hidden="true"><span></span><span></span></div>
-        <div><p class="eyebrow">WATCHING CONTROL DESK</p><h1>Queue<span>Tube</span> <small>v0.3</small></h1></div>
-        <div class="total" aria-label="Total queued"><strong id="total-count">0</strong><span>queued</span></div>
-      </header>
-
-      <section class="continue-card" id="continue-card" hidden aria-labelledby="continue-heading">
-        <p class="eyebrow">NOW PLAYING · <span id="current-state">PAUSED</span></p>
-        <div class="current-row"><img id="current-thumbnail" alt="" referrerpolicy="no-referrer"><div><h2 id="continue-heading">Current pick</h2><small id="current-meta">QueueTube player</small></div></div>
-        <button id="continue-player" type="button">Continue in player <span aria-hidden="true">↗</span></button>
+    <header class="masthead">
+      <img src="../../assets/icon32.png" width="32" height="32" alt="">
+      <div><h1>QueueTube <span id="version">0.3.2</span></h1><p>Your picks. Your pace.</p></div>
+      <span class="local-label">Local &amp; private</span>
+    </header>
+    <nav class="view-tabs" role="tablist" aria-label="Popup views">
+      <button id="queue-tab" role="tab" aria-selected="true" aria-controls="queue-view" type="button">Your queue <span id="total-count">0</span></button>
+      <button id="features-tab" role="tab" aria-selected="false" aria-controls="features-view" tabindex="-1" type="button">Features &amp; controls</button>
+    </nav>
+    <main class="content">
+      <section id="queue-view" role="tabpanel" aria-labelledby="queue-tab">
+        <section class="continue-card" id="continue-card" hidden aria-labelledby="continue-heading">
+          <p class="eyebrow">CURRENT PICK <span id="current-state">Ready</span></p>
+          <div class="current-row"><img id="current-thumbnail" alt="" width="96" height="54" referrerpolicy="no-referrer"><div><h2 id="continue-heading">Current pick</h2><small id="current-meta"></small></div></div>
+          <button id="continue-player" class="secondary-button" type="button">Return to player</button>
+        </section>
+        <div class="section-heading"><h2>Up next</h2><span id="mode-label">One player. Two lanes.</span></div>
+        <section class="lanes" aria-label="Video queues">
+          <article class="lane lane-short"><div><h3>Shorts</h3><span id="short-count">0</span></div><p>Quick picks</p><button data-open="short" type="button" disabled>Start Shorts <span aria-hidden="true">↗</span></button></article>
+          <article class="lane lane-video"><div><h3>Videos</h3><span id="video-count">0</span></div><p>Longer watches</p><button data-open="video" type="button" disabled>Start videos <span aria-hidden="true">↗</span></button></article>
+        </section>
+        <button class="room-button" id="open-room" type="button" disabled><span>Open Queue Room<small>Reorder, restore, and manage your picks</small></span><span aria-hidden="true">↗</span></button>
+        <label class="quick-toggle"><span><strong>Pause when leaving a tab</strong><small id="pause-explainer">Checking your preference…</small></span><input id="quick-pause" type="checkbox" role="switch" data-setting="pauseBackground" aria-describedby="pause-explainer" disabled></label>
+        <button type="button" id="shortcut-warning" class="shortcut-warning" hidden>Some shortcuts need keys. Open keyboard setup <span aria-hidden="true">↗</span></button>
+        <p class="queue-note">Choose what you watch. Change how it works in <button id="browse-features" type="button">Features &amp; controls</button>.</p>
       </section>
-
-      <button class="room-button" id="open-room" type="button"><span><small>OPEN THE</small><strong>Queue Room</strong></span><span class="room-arrow" aria-hidden="true">→</span></button>
-
-      <section class="lanes" aria-label="Video queues">
-        <article class="lane lane-short"><span class="lane-dot" aria-hidden="true"></span><div><p class="lane-status">QUICK RUN</p><h2>Shorts</h2><small>One player · manual play</small></div><strong class="lane-count" id="short-count">0</strong><button data-open="short" type="button">Start <span aria-hidden="true">▶</span></button></article>
-        <article class="lane lane-video"><span class="lane-dot" aria-hidden="true"></span><div><p class="lane-status">ZERO MEMORY</p><h2>Videos</h2><small>No page until selected</small></div><strong class="lane-count" id="video-count">0</strong><button data-open="video" type="button">Start <span aria-hidden="true">▶</span></button></article>
+      <section id="features-view" role="tabpanel" aria-labelledby="features-tab" hidden>
+        <div class="section-heading"><h2>Make it yours</h2><span id="feature-count"></span></div>
+        <p class="intro">Every preference, explained. Changes save automatically.</p>
+        <label class="search-box"><span class="sr-only">Find a feature</span><input id="feature-search" type="search" placeholder="Find playback, history, shortcuts…" autocomplete="off"></label>
+        <div id="feature-settings" class="feature-settings" aria-label="Feature controls"></div>
+        <p id="no-features" class="empty-message" hidden>No matching controls. Try “playback” or “theme”.</p>
+        <details class="feature-group tools-guide">
+          <summary>Queue tools &amp; shortcuts<span>On demand</span></summary>
+          <div class="guide-body"><p>In Queue Room: start either lane, return to the player, mark Done, Skip, move to Later, or restore Previous.</p><p>Reorder picks with drag or arrow buttons; select picks to move or remove together. Import open YouTube tabs, copy or restore a backup, filter or restore history, and clear queues or history.</p><p>These actions run only when you choose them. Chrome shortcut keys are assigned in Chrome’s keyboard settings.</p><button id="open-shortcuts" class="secondary-button" type="button">Keyboard setup</button></div>
+        </details>
       </section>
-
-      <button type="button" id="shortcut-warning" class="shortcut-warning" hidden><span aria-hidden="true">!</span><span><strong>Some shortcuts are not assigned</strong><small>Open Chrome shortcut settings</small></span><b aria-hidden="true">→</b></button>
-
-      <footer><p id="status" role="status" aria-live="polite">Ctrl-click a YouTube pick to begin.</p><p><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>Q</kbd></p></footer>
     </main>
-    <script src="popup.js"></script>
+    <footer><span class="status-dot" aria-hidden="true"></span><p id="status" role="status" aria-live="polite">Loading your queue…</p></footer>
+    <script src="popup.js" type="module"></script>
   </body>
 </html>

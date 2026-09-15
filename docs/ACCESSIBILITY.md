@@ -38,4 +38,6 @@ QueueTube player shortcuts are documented in the [README](../README.md#collect-a
 
 The manual keyboard and assistive-state checks live in [docs/TESTING.md](TESTING.md#verify-keyboard-and-screen-reader-access). QueueTube 0.3.0 was exercised in an isolated Chrome for Testing 151 profile at 1280×800 and 430×800 viewports. The browser smoke test also checks visible control names, tab state, live regions, and horizontal overflow.
 
+For v0.3.2, `tools/settings-smoke.mjs` checks all 24 controls have visible labels and associated help, popup tab-key navigation, live preference updates, persistence, light/dark themes, and 320-pixel reflow in both views. Popup screenshots were visually inspected at 420×588. These checks do not replace testing with an actual screen reader or the user's other YouTube extensions.
+
 Report an accessibility defect through [GitHub Issues](https://github.com/RayenBHK/QueueTube/issues). Include the Chrome version, operating system, input method, and assistive technology when applicable.

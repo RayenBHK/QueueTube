@@ -6,6 +6,7 @@
     <title>QueueTube Queue Room</title>
     <script src="../theme-init.js"></script>
     <link rel="stylesheet" href="sidepanel.css">
+    <link rel="stylesheet" href="../settings-ui.css">
   </head>
   <body>
     <a class="skip-link" href="#queue-view">Skip to queue</a>
@@ -18,7 +19,7 @@
 
       <section class="now-playing" id="now-playing" aria-labelledby="now-heading">
         <div class="now-topline"><p class="eyebrow" id="now-heading">NOW PLAYING</p><span class="state-pill" id="player-state">Idle</span></div>
-        <div class="now-empty" id="now-empty"><strong>Your player is standing by.</strong><span>Start either lane. QueueTube loads one pick at a time and waits for you to press play.</span></div>
+        <div class="now-empty" id="now-empty"><strong>Your player is standing by.</strong><span>Start either lane. QueueTube loads one pick at a time using your playback preferences.</span></div>
         <div class="now-content" id="now-content" hidden>
           <img id="now-thumbnail" alt="" referrerpolicy="no-referrer">
           <div class="now-copy"><span class="now-kind" id="now-kind">Short</span><strong id="now-title">Current pick</strong><small id="now-meta">YouTube</small></div>
@@ -57,7 +58,7 @@
         </div>
 
         <section class="lane lane-short" aria-labelledby="short-heading">
-          <header class="lane-heading"><div class="lane-rail" aria-hidden="true"><i></i></div><div><p class="lane-status">QUICK RUN · MANUAL PLAY</p><h2 id="short-heading">Shorts <span id="short-count">0</span></h2></div><button class="play-lane" type="button" data-open-lane="short">Start lane <span aria-hidden="true">→</span></button></header>
+          <header class="lane-heading"><div class="lane-rail" aria-hidden="true"><i></i></div><div><p class="lane-status">QUICK RUN · YOUR PACE</p><h2 id="short-heading">Shorts <span id="short-count">0</span></h2></div><button class="play-lane" type="button" data-open-lane="short">Start lane <span aria-hidden="true">→</span></button></header>
           <ol class="queue-list" id="short-list"></ol>
           <div class="empty-state" id="short-empty"><strong>The fast lane is clear.</strong><span>Ctrl-click a Short on YouTube to save it here.</span></div>
         </section>
@@ -79,20 +80,7 @@
 
         <details class="settings-panel">
           <summary><span>Controls &amp; protection</span><span class="summary-hint">SETTINGS</span></summary>
-          <div class="setting-list">
-            <label class="select-setting"><span><b>Theme</b><small>Follow the system or choose a fixed look</small></span><select id="theme-select"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
-            <label class="select-setting"><span><b>Collecting mode</b><small>Queue Room saves links; Classic opens grouped tabs</small></span><select id="capture-mode"><option value="queue-room">Queue Room</option><option value="classic-tabs">Classic tabs</option></select></label>
-            <label><span><b>Compact density</b><small>Fit more picks without hiding controls</small></span><input type="checkbox" data-setting="compactDensity"></label>
-            <label><span><b>Catch Ctrl / ⌘-click</b><small>Your normal collecting gesture</small></span><input type="checkbox" data-setting="captureCtrlClick"></label>
-            <label><span><b>Catch middle-click</b><small>Queue wheel-clicks too</small></span><input type="checkbox" data-setting="captureMiddleClick"></label>
-            <label><span><b>Manual play only</b><small>Queued and background media stay paused</small></span><input type="checkbox" data-setting="pauseBackground"></label>
-            <label><span><b>Focus Shield</b><small>Hide related videos, comments, and end cards</small></span><input type="checkbox" data-setting="focusShield"></label>
-            <label><span><b>Queue badges</b><small>Mark picks already waiting on YouTube</small></span><input type="checkbox" data-setting="showQueuedBadges"></label>
-            <label><span><b>Advance Shorts</b><small>Load the next Short, paused</small></span><input type="checkbox" data-setting="autoAdvanceShorts"></label>
-            <label><span><b>Advance videos</b><small>Load the next long video, paused</small></span><input type="checkbox" data-setting="autoAdvanceVideos"></label>
-            <label><span><b>Remove finished picks</b><small>Move watched and skipped items to history</small></span><input type="checkbox" data-setting="removeFinished"></label>
-            <label><span><b>Block duplicates</b><small>Keep each pick once</small></span><input type="checkbox" data-setting="preventDuplicates"></label>
-          </div>
+          <div id="feature-settings" class="feature-settings"></div>
           <section class="shortcut-settings" aria-labelledby="shortcut-heading">
             <div><p class="eyebrow">GLOBAL SHORTCUTS</p><h3 id="shortcut-heading">Keyboard setup</h3></div><ul id="command-list"></ul>
             <button type="button" id="open-shortcuts" class="quiet-button">Open Chrome shortcut settings</button>
@@ -114,9 +102,9 @@
     <dialog id="import-dialog" aria-labelledby="import-title"><form method="dialog"><p class="eyebrow">IMPORT TABS</p><h2 id="import-title">Gather open YouTube tabs?</h2><p>QueueTube sorts eligible tabs into the Queue Room. Only newly imported tabs can be closed.</p><label class="dialog-choice"><input type="checkbox" id="close-imported-tabs"><span><b>Close imported tabs</b><small>Free their memory after saving</small></span></label><div class="dialog-actions"><button value="cancel" class="quiet-button">Cancel</button><button value="confirm" class="primary-button">Import</button></div></form></dialog>
     <dialog id="clear-dialog" aria-labelledby="clear-title"><form method="dialog"><p class="eyebrow">CLEAR QUEUE</p><h2 id="clear-title">Remove every waiting pick?</h2><p>Your watch history stays intact.</p><div class="dialog-actions"><button value="cancel" class="quiet-button">Cancel</button><button value="confirm" class="danger-button">Clear queue</button></div></form></dialog>
     <dialog id="restore-dialog" aria-labelledby="restore-title"><form method="dialog"><p class="eyebrow">RESTORE BACKUP</p><h2 id="restore-title">Bring a queue back</h2><label for="backup-json">Paste QueueTube backup JSON</label><textarea id="backup-json" rows="8" spellcheck="false" placeholder="{ &quot;version&quot;: 3, ... }"></textarea><fieldset><legend>Restore mode</legend><label><input type="radio" name="restore-mode" value="merge" checked> Merge with this queue</label><label><input type="radio" name="restore-mode" value="replace"> Replace this queue</label></fieldset><div class="dialog-actions"><button value="cancel" class="quiet-button">Cancel</button><button value="confirm" class="primary-button">Restore</button></div></form></dialog>
-    <dialog id="help-dialog" aria-labelledby="help-title"><form method="dialog"><p class="eyebrow">KEYBOARD</p><h2 id="help-title">Move through a queue</h2><dl class="key-map"><div><dt><kbd>W</kbd></dt><dd>Mark done and load the next pick paused</dd></div><div><dt><kbd>N</kbd></dt><dd>Move this pick to Later and load the next</dd></div><div><dt><kbd>P</kbd></dt><dd>Restore the previous pick</dd></div><div><dt><kbd>X</kbd></dt><dd>Skip and load the next pick</dd></div><div><dt><kbd>?</kbd></dt><dd>Show or hide this guide</dd></div></dl><div class="dialog-actions"><button value="close" class="primary-button">Got it</button></div></form></dialog>
+    <dialog id="help-dialog" aria-labelledby="help-title"><form method="dialog"><p class="eyebrow">KEYBOARD</p><h2 id="help-title">Move through a queue</h2><dl class="key-map"><div><dt><kbd>W</kbd></dt><dd>Mark done and load the next pick</dd></div><div><dt><kbd>N</kbd></dt><dd>Move this pick to Later and load the next</dd></div><div><dt><kbd>P</kbd></dt><dd>Restore the previous pick</dd></div><div><dt><kbd>X</kbd></dt><dd>Skip and load the next pick</dd></div><div><dt><kbd>?</kbd></dt><dd>Show or hide this guide</dd></div></dl><div class="dialog-actions"><button value="close" class="primary-button">Got it</button></div></form></dialog>
 
     <template id="queue-item-template"><li class="queue-item" draggable="true"><label class="select-pick"><input type="checkbox" data-select-item><span class="sr-only">Select pick</span></label><span class="drag-handle" aria-hidden="true">⋮⋮</span><button class="thumbnail-button" type="button" data-action="play"><img alt="" loading="lazy" referrerpolicy="no-referrer"><span class="duration"></span><span class="play-mark" aria-hidden="true">▶</span></button><div class="item-copy"><button class="item-title" type="button" data-action="play"></button><span class="item-channel"></span></div><div class="item-actions"><button type="button" data-action="up" aria-label="Move up">↑</button><button type="button" data-action="down" aria-label="Move down">↓</button><button type="button" data-action="remove" aria-label="Remove">×</button></div></li></template>
-    <script src="sidepanel.js"></script>
+    <script src="sidepanel.js" type="module"></script>
   </body>
 </html>

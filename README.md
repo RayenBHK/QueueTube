@@ -3,7 +3,7 @@
 
 # Queue YouTube picks without opening more tabs
 
-QueueTube turns Ctrl-click into a deliberate YouTube queue. Shorts and long videos stay organized as lightweight local records, then move through one reusable player tab—paused until you choose to play.
+QueueTube turns Ctrl-click into a deliberate YouTube queue. Shorts and long videos stay organized as lightweight local records, then move through one reusable player tab. Picks start paused by default; every playback preference is explained in the popup.
 
 ![QueueTube v0.3 Queue Room](store-assets/screenshot-queue-room-1280x800.png)
 
@@ -11,10 +11,11 @@ QueueTube turns Ctrl-click into a deliberate YouTube queue. Shorts and long vide
 
 - **Separate lanes:** keeps Shorts and long videos ordered independently
 - **One-tab player:** reuses one YouTube page across the whole queue
-- **Reliable sequence:** Done, Skip, and natural completion load the next pick paused
+- **Reliable sequence:** Done, Skip, and natural completion load the next pick, paused by default
 - **Later, not next:** `N` rotates the current pick to the end of its lane
 - **Zero-memory waiting:** stores long videos as links until selected
-- **Manual playback:** blocks queued and hidden media until you press play
+- **Independent playback controls:** choose whether picks start paused and whether switching tabs pauses playback
+- **Feature controls:** search and change all 24 preferences in the popup or Queue Room
 - **Now Playing:** shows state, lane position, next context, and recovery controls
 - **Focus Shield:** hides related videos, comments, merchandise, and end cards
 - **Time budgets:** supports 10, 20, 30, or any whole number up to 180 minutes
@@ -23,6 +24,14 @@ QueueTube turns Ctrl-click into a deliberate YouTube queue. Shorts and long vide
 - **Classic tabs:** keeps the original grouped-tab workflow as an optional mode
 
 QueueTube has no server, account, analytics, ads, or external JavaScript.
+
+## Customize v0.3.2
+
+Open the popup and select **Features & controls** for the complete preference list. To listen while using another tab, turn off **Pause when leaving a tab** on the popup's main view. Keep **Start each pick paused** on if you still want to start each video yourself. Returning to a paused tab does not automatically resume playback.
+
+Changes save locally and update open YouTube pages. After reloading the extension for an update, refresh previously open YouTube tabs once to load the new content script. Classic tab sleeping and other extensions can also stop or hide playback.
+
+See [all features and controls](docs/FEATURES.md) for defaults, scope, and on-demand queue tools.
 
 ## Install or update the local build
 
@@ -43,7 +52,7 @@ Chrome 116 or newer is required.
 1. Browse YouTube Home or Subscriptions.
 2. Ctrl-click, Command-click, or middle-click a video or Short.
 3. Open QueueTube and choose **Queue Room**.
-4. Start Shorts or Videos; QueueTube loads the first pick paused.
+4. Start Shorts or Videos; QueueTube loads the first pick paused by default.
 5. Press play in YouTube, then move through the lane with the controls below.
 
 QueueTube marks queued thumbnails and blocks duplicates by default.
@@ -52,13 +61,13 @@ QueueTube marks queued thumbnails and blocks duplicates by default.
 
 | Key | Action |
 | --- | --- |
-| `W` | Mark Done and load the next pick paused |
-| `N` | Move the current pick to Later, then load the next paused |
+| `W` | Mark Done and load the next pick |
+| `N` | Move the current pick to Later, then load the next |
 | `P` | Restore and load the previous watched or skipped pick |
-| `X` | Mark Skipped and load the next pick paused |
+| `X` | Mark Skipped and load the next pick |
 | `?` | Show or hide the keyboard guide |
 
-These keys do not run while you are typing in a field. YouTube's Space and `K` play/pause keys still work.
+Picks follow your **Start each pick paused** preference. Turn **Player keyboard controls** off to disable these keys. They do not run while you are typing in a field. YouTube's Space and `K` play/pause keys still work.
 
 ### Chrome-wide shortcuts
 

@@ -4,7 +4,14 @@
     captureCtrlClick: true,
     captureMiddleClick: true,
     pauseBackground: true,
+    manualPlay: true,
     focusShield: true,
+    hideRelated: true,
+    hideComments: true,
+    hideEndCards: true,
+    hideMerch: true,
+    playerShortcuts: true,
+    showToasts: true,
     showQueuedBadges: true
   };
   const CARD_SELECTOR = [
@@ -88,9 +95,9 @@
       if (result.duplicate) {
         showToast(result.kind === "short" ? "Short already queued" : "Video already queued");
       } else if (result.mode === "classic-tabs") {
-        showToast(result.kind === "short" ? "Short opened · ready, paused" : "Video opened · sleeping", result.kind);
+        showToast(result.kind === "short" ? "Short added to tab group" : "Video added to tab group", result.kind);
       } else {
-        showToast(result.kind === "short" ? "Short saved · no new tab" : "Video saved · zero memory", result.kind);
+        showToast(result.kind === "short" ? "Short saved · no new tab" : "Video saved · no new tab", result.kind);
       }
       scheduleBadgeRefresh(0);
     } catch {
@@ -127,8 +134,8 @@
   }
 
   function shouldBlockPlayback() {
-    if (!settings.pauseBackground) return false;
-    return document.hidden || Boolean(queuedPageKey && !manualPlaybackUnlocked);
+    return (settings.pauseBackground && document.hidden) ||
+      Boolean(settings.manualPlay && queuedPageKey && !manualPlaybackUnlocked);
   }
 
   function pauseMedia(media) {
@@ -155,7 +162,7 @@
   }
 
   async function handleQueueShortcut(event) {
-    if (!queuedPageKey || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (!settings.playerShortcuts || !queuedPageKey || event.ctrlKey || event.metaKey || event.altKey) return;
     const target = event.target;
     if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable) return;
     if (event.key === "?") {
@@ -206,6 +213,11 @@
   function applyFocusShield() {
     const isPlayer = location.pathname === "/watch" || location.pathname.startsWith("/shorts/");
     document.documentElement.classList.toggle("queuetube-focus-shield", Boolean(settings.focusShield && isPlayer));
+    for (const key of ["hideRelated", "hideComments", "hideEndCards", "hideMerch"]) {
+      document.documentElement.classList.toggle(`queuetube-${key}`, Boolean(settings[key]));
+    }
+    if (!settings.playerShortcuts) document.getElementById("queuetube-help-root")?.remove();
+    if (!settings.showToasts) document.getElementById("queuetube-toast-root")?.remove();
   }
 
   function syncQueuePage() {
@@ -283,8 +295,8 @@
         @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
       </style>
       <section class="card" role="dialog" aria-label="QueueTube keyboard help"><p>QUEUETUBE PLAYER KEYS</p><dl>
-        <div><dt><kbd>W</kbd></dt><dd>Done · load next paused</dd></div><div><dt><kbd>N</kbd></dt><dd>Later · rotate to lane end</dd></div>
-        <div><dt><kbd>P</kbd></dt><dd>Restore previous pick</dd></div><div><dt><kbd>X</kbd></dt><dd>Skip · load next paused</dd></div>
+        <div><dt><kbd>W</kbd></dt><dd>Done · load next pick</dd></div><div><dt><kbd>N</kbd></dt><dd>Later · rotate to lane end</dd></div>
+        <div><dt><kbd>P</kbd></dt><dd>Restore previous pick</dd></div><div><dt><kbd>X</kbd></dt><dd>Skip · load next pick</dd></div>
         <div><dt><kbd>?</kbd></dt><dd>Close this guide</dd></div></dl><small>Space or K still controls YouTube play/pause.</small></section>`;
     (document.documentElement || document).appendChild(host);
   }
@@ -303,6 +315,7 @@
         const batch = anchors.slice(index, index + batchSize);
         await new Promise((resolve) => {
           requestAnimationFrame(() => {
+            if (!settings.showQueuedBadges) { resolve(); return; }
             for (const anchor of batch) {
               const url = new URL(anchor.href, location.href);
               const videoId = url.pathname.startsWith("/shorts/")
@@ -330,6 +343,8 @@
   }
 
   function showToast(message, tone = "neutral") {
+    // Errors remain visible even when routine notifications are disabled.
+    if (!settings.showToasts && tone !== "error") return;
     let host = document.getElementById("queuetube-toast-root");
     if (!host) {
       host = document.createElement("div");
@@ -370,7 +385,7 @@
   async function initialize() {
     try {
       const stored = await chrome.storage.local.get({ qtSettings: DEFAULT_SETTINGS });
-      settings = { ...DEFAULT_SETTINGS, ...stored.qtSettings };
+      settings = readSettings(stored.qtSettings);
     } catch {
       settings = { ...DEFAULT_SETTINGS };
     }
@@ -378,9 +393,16 @@
     scheduleBadgeRefresh(0);
   }
 
+  function readSettings(raw = {}) {
+    return {
+      ...DEFAULT_SETTINGS, ...raw,
+      manualPlay: typeof raw.manualPlay === "boolean" ? raw.manualPlay : raw.pauseBackground !== false
+    };
+  }
+
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== "local") return;
-    if (changes.qtSettings) settings = { ...DEFAULT_SETTINGS, ...changes.qtSettings.newValue };
+    if (changes.qtSettings) settings = readSettings(changes.qtSettings.newValue);
     if (changes.qtSettings || changes.qtQueueItems) {
       syncQueuePage();
       scheduleBadgeRefresh(0);

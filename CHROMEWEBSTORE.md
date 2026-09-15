@@ -3,9 +3,9 @@
 
 # Prepare QueueTube for the Chrome Web Store
 
-This document contains copy-ready listing text, permission reasons, privacy disclosures, assets, and submission status for QueueTube 0.3.1.
+This document contains copy-ready listing text, permission reasons, privacy disclosures, assets, and submission status for QueueTube 0.3.2.
 
-> Last updated: 2026-09-14
+> Last updated: 2026-09-15
 
 ## Store listing
 
@@ -25,8 +25,10 @@ FEATURES
 • Keep Shorts and long videos in separate, ordered lanes
 • Save picks with Ctrl-click, Command-click, or middle-click
 • Watch the queue through one reusable YouTube player tab
-• Keep every queued video paused until you press play
-• Load the next Short or long video in the same player without autoplay
+• Keep queued videos paused by default, with independent background-listening controls
+• Load the next Short or long video in the same player using your playback preferences
+• Search and adjust all 24 preferences in the redesigned popup
+• Choose which distractions Focus Shield hides and whether to save new history
 • Use Done, Later, Previous, and Skip controls from the Queue Room or keyboard
 • See the current pick, lane position, next item, and playback state
 • Hide related videos, comments, merchandise, and end cards with Focus Shield
@@ -55,7 +57,7 @@ Report defects or request features at https://github.com/RayenBHK/QueueTube/issu
 
 QueueTube is an independent project. It is not affiliated with or endorsed by YouTube or Google.
 
-Version 0.3.1 fixes Queue Room opening from its Chrome keyboard shortcut. It includes the paused sequencing, Now Playing controls, player keys, themes, bulk tools, validated backup restore, custom budgets, and filtered history added in 0.3.0.
+Version 0.3.2 adds a polished popup with a searchable feature catalog, independent manual-start and tab-switch pausing controls, and switches for Focus Shield components, history recording, notifications, and the toolbar count.
 
 **Category**
 
@@ -159,6 +161,7 @@ https://github.com/RayenBHK/QueueTube
 
 | Version | Date | Changes | Status |
 | --- | --- | --- | --- |
+| 0.3.2 | 2026-09-15 | Redesigned popup, 24 explained controls, independent playback switches, and optional history/feedback | Automated and isolated-browser settings checks passed; personal YouTube verification pending |
 | 0.3.1 | 2026-09-14 | Fix Queue Room shortcut opening and narrow-panel selection overflow | Automated checks passed; manual Chrome verification pending |
 | 0.3.0 | 2026-09-14 | Paused sequencing, Now Playing, player keys, shortcut onboarding, themes, bulk/restore tools, custom budgets, and history filters | Release candidate verified |
 | 0.2.0 | 2026-09-13 | Queue Room, one-tab playback, time budgets, local history, Focus Shield, tab import, and release tooling | Ready for dashboard upload |
@@ -168,25 +171,25 @@ https://github.com/RayenBHK/QueueTube
 
 ### Package and behavior
 
-- [x] Manifest V3 with version 0.3.1
+- [x] Manifest V3 with version 0.3.2
 - [x] Manifest name and short description match this listing
 - [x] Host access stays scoped to YouTube
 - [x] Every permission has a feature-specific reason
 - [x] Local files and icon dimensions pass automated checks
 - [x] Package script excludes repository, tests, docs, and store assets
 - [x] No remote JavaScript, analytics, obfuscation, or synchronized storage
-- [ ] Complete the final unpacked-extension test on current YouTube after reloading version 0.3.1
+- [ ] Complete the final unpacked-extension test on current YouTube after reloading version 0.3.2
 - [ ] Confirm popup, side panel, service worker, and content-script consoles have no new errors
 
 ### Listing and account
 
 - [x] Store icon is current
-- [x] Two current 1280×800 screenshots are ready
+- [ ] Refresh the existing 1280×800 listing screenshots to show v0.3.2 controls
 - [x] Small promo tile is ready
 - [x] Capture the real-YouTube screenshot after final browser testing
 - [ ] Verify the public privacy-policy URL
 - [ ] Add and verify a monitored public contact email
-- [ ] Upload `dist/queuetube-v0.3.1.zip` through the Chrome Developer Dashboard
+- [ ] Upload `dist/queuetube-v0.3.2.zip` through the Chrome Developer Dashboard
 
 ## Review notes
 

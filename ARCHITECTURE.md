@@ -58,7 +58,13 @@ The playback URL carries three QueueTube parameters:
 - `qt_item`: maps playback back to the stored queue record
 - `qt_transition`: identifies one exact player navigation and rejects late events from the previous page
 
-The content script pauses a controlled page until a pointer or keyboard action targets the player. When either a Short or long video ends, QueueTube records the outcome and loads the next item in that lane into the same tab. Every new item remains paused. When a lane ends, QueueTube stops and exposes a deliberate handoff to the other lane.
+The `manualPlay` preference blocks a controlled page until a pointer or keyboard action targets the player. The independent `pauseBackground` preference pauses YouTube media when its tab is hidden. Both default to on. Each lane has an auto-advance preference; completion records history only when `recordHistory` is enabled. New navigations rebuild the playback URL using current settings, including previously saved picks.
+
+## Expose preferences consistently
+
+`src/settings-ui.js` contains the complete feature catalog and shared controls used by both extension views. Every `DEFAULT_SETTINGS` key must appear exactly once; a regression test checks this. Both views send validated patches to the worker and listen for storage changes. A settings-specific Web Lock serializes read/merge/write operations so simultaneous patches do not overwrite each other.
+
+When migrating pre-v0.3.2 settings, a missing `manualPlay` value inherits the old `pauseBackground` value. Once stored separately, the two switches are independent. New preferences have backward-compatible defaults and keep storage/backup schema 3.
 
 ## Guard playback transitions
 
@@ -83,7 +89,7 @@ stateDiagram-v2
 
 Player writes run under a dedicated `navigator.locks` lock. Queue writes use a separate lock. Done, Skip, Later, Previous, and natural completion therefore serialize without blocking ordinary reads. A page event must match the stored player tab, item ID, and transition token before it can change state or history.
 
-`N` is a queue operation rather than an outcome: it moves the current item to the end of its lane, does not write history, and loads the following item paused. Done and natural completion record `watched`; Skip records `skipped`; Previous removes the newest history entry and restores it to its lane.
+`N` is a queue operation rather than an outcome: it moves the current item to the end of its lane, does not write history, and loads the following item using the playback preferences. When history recording is enabled, Done and natural completion record `watched`, and Skip records `skipped`. Previous removes the newest history entry and restores it to its lane.
 
 ## Migrate and restore local data
 

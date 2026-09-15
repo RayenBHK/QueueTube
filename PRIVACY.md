@@ -5,13 +5,15 @@
 
 QueueTube stores your queue and preferences on your device. It has no QueueTube server, account system, analytics, advertising, or data sale.
 
-Last updated: September 14, 2026
+Last updated: September 15, 2026
 
 ## Data QueueTube handles
 
 QueueTube reads the YouTube link and visible card metadata for videos you deliberately queue. That metadata can include the video's identifier, title, channel name, thumbnail URL, duration, and collection time.
 
 QueueTube also stores your settings, theme choice, viewing-session budget, current QueueTube player state, and watched or skipped history.
+
+Turn off **Save watch history** in the popup's **Features & controls** to stop recording new watched/skipped entries. Existing history remains until you clear it. History is limited to the latest 200 entries.
 
 ## How QueueTube stores data
 

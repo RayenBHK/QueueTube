@@ -5,6 +5,29 @@
 
 This changelog records user-facing features, fixes, and compatibility changes for each QueueTube release.
 
+## 0.3.2: 2026-09-15
+
+### Added
+
+- Redesigned popup with queue and searchable Features & controls views, 24 explained preferences, live saving, and a prominent pause-on-tab-switch control
+- Independent switches for starting each pick paused and pausing when its tab becomes hidden
+- Individual Focus Shield controls for related videos, comments, end cards, and merchandise
+- Switches for player keyboard controls, new history recording, routine notifications, and the toolbar count
+- One shared feature catalog for the popup and Queue Room, including previously hidden Shorts-player and Classic sleeping settings
+- Automated playback-policy regressions and an isolated Chrome settings smoke test
+
+### Fixed
+
+- Concurrent preference changes no longer overwrite each other
+- Previously queued picks honor current Shorts-player and manual-start preferences when reopened
+- Session time limits update the running timer and persist as the next session's default
+- Legacy manual-play choices survive the split into independent controls; backup schema remains 3
+
+### Compatibility
+
+- No new permissions, network services, or analytics
+- Refresh existing YouTube tabs after reloading the extension to load the updated content script
+
 ## 0.3.1: 2026-09-14
 
 ### Fixed
