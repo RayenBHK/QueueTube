@@ -12,6 +12,7 @@ const port = 9232;
 const base = `http://127.0.0.1:${port}`;
 const browser = spawn(resolve(root, ".tools/chrome-win64/chrome.exe"), [
   "--headless=new", "--enable-automation", "--no-first-run", "--no-default-browser-check",
+  "--screen-info={1920x1080}", "--window-size=1280,800",
   `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, "--disable-background-networking",
   `--disable-extensions-except=${root}`, `--load-extension=${root}`, "about:blank"
 ], { windowsHide: true, stdio: "ignore" });
@@ -76,7 +77,7 @@ try {
   const commandLine = await browserClient.send("Browser.getBrowserCommandLine");
   assert.ok(commandLine.arguments.includes(`--user-data-dir=${profile}`), "Refuse any browser other than this test's fresh profile");
   verifiedProfile = true;
-  const extension = await evaluate(worker, "chrome.runtime.getURL('')");
+  const extension = await poll(() => evaluate(worker, "globalThis.chrome?.runtime?.getURL('')"));
   const popup = await page(`${extension}src/popup/popup.html`);
   await poll(() => evaluate(popup, "document.querySelector('#quick-pause')?.disabled === false"));
   await popup.send("Emulation.setDeviceMetricsOverride", { width: 420, height: 588, deviceScaleFactor: 1, mobile: false });
@@ -92,7 +93,12 @@ try {
   const manifest = JSON.parse(await readFile(resolve(root, "manifest.json"), "utf8"));
   assert.equal(await evaluate(popup, "document.querySelector('#version').textContent"), manifest.version);
   const capture = async (client, name) => {
-    const { data } = await client.send("Page.captureScreenshot", { format: "png" });
+    const size = await evaluate(client, "[Math.round(innerWidth * devicePixelRatio), Math.round(innerHeight * devicePixelRatio)]");
+    // Native popup layout can settle before its compositor surface has resized.
+    const { data } = await poll(() => client.send("Page.captureScreenshot", { format: "png" }), ({ data }) => {
+      const png = Buffer.from(data, "base64");
+      return png.readUInt32BE(16) === size[0] && png.readUInt32BE(20) === size[1];
+    });
     await writeFile(resolve(artifacts, name), Buffer.from(data, "base64"));
   };
   await capture(popup, "v0.3.2-popup-dark.png");
@@ -116,10 +122,7 @@ try {
   await evaluate(popup, "chrome.runtime.sendMessage({type:'UPDATE_SETTINGS',patch:{theme:'light'}})");
   await poll(() => evaluate(popup, "document.documentElement.dataset.theme==='light'"));
   await capture(popup, "v0.3.2-features-light.png");
-  for (const width of [320, 420]) {
-    await popup.send("Emulation.setDeviceMetricsOverride", { width, height: 588, deviceScaleFactor: 1, mobile: false });
-    assert.equal(await evaluate(popup, "document.documentElement.scrollWidth <= innerWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth"), true, `Popup reflows at ${width}px`);
-  }
+  assert.equal(await evaluate(popup, "document.documentElement.scrollWidth <= innerWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth"), true, "Popup content fits its 420px layout");
   await panel.send("Emulation.setDeviceMetricsOverride", { width: 320, height: 800, deviceScaleFactor: 1, mobile: false });
   await evaluate(panel, "document.querySelector('.settings-panel').open=true;document.querySelectorAll('.feature-group').forEach(group=>group.open=true)");
   assert.equal(await evaluate(panel, "document.documentElement.scrollWidth<=innerWidth"), true, "Queue Room settings reflow at 320px");
@@ -132,9 +135,42 @@ try {
   await poll(() => evaluate(reopened, "document.querySelector('#quick-pause')?.disabled===false"));
   assert.equal((await state(reopened)).settings.focusShield, false);
   assert.equal((await state(reopened)).settings.theme, "light");
+
+  // A normal tab with emulated dimensions cannot verify toolbar auto-sizing.
+  const nativePopups = [];
+  for (const [width, height] of [[1280, 800], [800, 600]]) {
+    await evaluate(worker, `(async () => {
+      const window = await chrome.windows.getLastFocused();
+      await chrome.windows.update(window.id, { state: 'normal', left: 0, top: 0, width: ${width}, height: ${height} });
+    })()`);
+    const existingTargets = new Set((await (await fetch(`${base}/json/list`)).json()).map((target) => target.id));
+    await evaluate(worker, "chrome.action.openPopup()");
+    const target = await poll(async () => (await (await fetch(`${base}/json/list`)).json()).find((target) => !existingTargets.has(target.id) && target.url === `${extension}src/popup/popup.html`));
+    const nativePopup = await connect(target);
+    await poll(() => evaluate(nativePopup, "document.querySelector('#quick-pause')?.disabled===false"));
+    const metrics = await evaluate(nativePopup, `({
+      width: innerWidth, height: innerHeight, bodyWidth: document.body.offsetWidth,
+      footerBottom: document.querySelector('footer').getBoundingClientRect().bottom,
+      horizontalOverflow: document.documentElement.scrollWidth > innerWidth || document.querySelector('.content').scrollWidth > document.querySelector('.content').clientWidth
+    })`);
+    assert.equal(metrics.bodyWidth, 420, "Real toolbar popup must not shrink to its initial viewport");
+    assert.ok(metrics.width >= 420 && metrics.width <= 440, "Popup fits its preferred width, allowing a browser scrollbar gutter");
+    assert.ok(metrics.height > 400 && metrics.height <= 600, "Real popup has usable height within Chrome's limit");
+    assert.ok(metrics.footerBottom <= metrics.height, "Short windows keep the footer inside the popup");
+    assert.equal(metrics.horizontalOverflow, false, "Real popup has no horizontal overflow");
+    await evaluate(nativePopup, "document.querySelector('#features-tab').click();document.querySelector('.content').scrollTop=99999");
+    assert.ok(await evaluate(nativePopup, "document.querySelector('.content').scrollTop>0"), "All features remain reachable through the content scroller");
+    await evaluate(nativePopup, "document.querySelector('#queue-tab').click()");
+    await evaluate(nativePopup, "new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
+    await capture(nativePopup, `v0.3.2-toolbar-${width}x${height}.png`);
+    nativePopups.push({ window: [width, height], ...metrics });
+    await evaluate(nativePopup, "window.close()");
+    await poll(async () => !(await (await fetch(`${base}/json/list`)).json()).some((entry) => entry.id === target.id));
+  }
   assert.ok(clients.every((client) => !client.errors.length), "No uncaught extension errors");
-  console.log(`QueueTube ${manifest.version}: browser checks passed (${controls.length} controls, persistence, live sync, search, keyboard, themes, 320px reflow).`);
-  await writeFile(resolve(artifacts, "v0.3.2-settings-smoke.json"), JSON.stringify({ version: manifest.version, passed: true, controls: controls.length, screenshots: ["v0.3.2-popup-dark.png", "v0.3.2-features-dark.png", "v0.3.2-features-light.png"] }, null, 2));
+  console.log(`QueueTube ${manifest.version}: browser checks passed (${controls.length} controls, persistence, live sync, search, keyboard, themes, 320px Queue Room, native toolbar sizing in two window sizes).`);
+  console.log(JSON.stringify(nativePopups));
+  await writeFile(resolve(artifacts, "v0.3.2-settings-smoke.json"), JSON.stringify({ version: manifest.version, passed: true, controls: controls.length, nativePopups, screenshots: ["v0.3.2-popup-dark.png", "v0.3.2-features-dark.png", "v0.3.2-features-light.png", "v0.3.2-toolbar-1280x800.png", "v0.3.2-toolbar-800x600.png"] }, null, 2));
 } finally {
   if (verifiedProfile) { try { await browserClient.send("Browser.close"); } catch { /* Process cleanup follows. */ } }
   for (const client of clients) client.socket.close();

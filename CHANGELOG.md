@@ -18,6 +18,8 @@ This changelog records user-facing features, fixes, and compatibility changes fo
 
 ### Fixed
 
+- Toolbar popup no longer collapses to its initial viewport width; explicit root sizing keeps cards and labels readable, with scrolling inside the content area
+- Browser verification now opens the native toolbar popup instead of relying only on a tab with emulated dimensions
 - Concurrent preference changes no longer overwrite each other
 - Previously queued picks honor current Shorts-player and manual-start preferences when reopened
 - Session time limits update the running timer and persist as the next session's default

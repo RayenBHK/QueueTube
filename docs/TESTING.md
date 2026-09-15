@@ -140,7 +140,9 @@ Open `dist/queuetube-v0.3.2.zip`. It must contain only `manifest.json`, `assets/
 
 ## Verify v0.3.2 feature controls
 
-Run `node tools/settings-smoke.mjs` with Chrome for Testing installed under `.tools/chrome-win64/`. It launches its own fresh headless profile, verifies ownership before changing test data, and closes that browser afterward. It checks the actual popup and Queue Room for catalog coverage, persistence, live synchronization, search, keyboard navigation, themes, and 320px reflow. Screenshots and a report are saved under `.artifacts/`.
+Run `node tools/settings-smoke.mjs` with Chrome for Testing installed under `.tools/chrome-win64/`. It launches its own fresh headless profile, verifies ownership before changing test data, and closes that browser afterward. It checks catalog coverage, persistence, live synchronization, search, keyboard navigation, themes, and 320px Queue Room reflow. It then uses `chrome.action.openPopup()` to check native toolbar sizing in 1280×800 and 800×600 windows, footer visibility, scrolling to the remaining features, and absence of horizontal overflow. These native checks must not apply a viewport override: a normal tab with forced dimensions cannot catch toolbar auto-sizing failures. Screenshots and a report are saved under `.artifacts/`.
+
+Manually click the toolbar icon after reloading the extension. Confirm the popup is about 420 pixels wide, both lanes are visible, labels do not collapse into narrow columns, and Features & controls scrolls without horizontal scrolling. Test in a smaller window and with your usual display scaling. Changing Compact layout must not shrink the outer popup width.
 
 For the live YouTube check, reload the extension and refresh previously open YouTube tabs once:
 

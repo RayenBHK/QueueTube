@@ -57,7 +57,7 @@ Report defects or request features at https://github.com/RayenBHK/QueueTube/issu
 
 QueueTube is an independent project. It is not affiliated with or endorsed by YouTube or Google.
 
-Version 0.3.2 adds a polished popup with a searchable feature catalog, independent manual-start and tab-switch pausing controls, and switches for Focus Shield components, history recording, notifications, and the toolbar count.
+Version 0.3.2 adds a polished popup with a searchable feature catalog, independent manual-start and tab-switch pausing controls, and switches for Focus Shield components, history recording, notifications, and the toolbar count. A corrected popup width keeps labels and queue cards readable when opened from the toolbar.
 
 **Category**
 
