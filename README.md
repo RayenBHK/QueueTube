@@ -95,6 +95,8 @@ Open **Controls & protection**, then change **Collecting mode** to **Classic tab
 
 ## Develop and verify QueueTube
 
+Continuing after a model switch or usage limit? Start with the [agent handoff](docs/HANDOFF.md) and repository [agent instructions](AGENTS.md).
+
 QueueTube uses browser-native JavaScript and has no runtime dependencies. With Node.js 22 or newer:
 
 ```powershell
