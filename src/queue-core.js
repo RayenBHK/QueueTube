@@ -364,6 +364,20 @@ export function getLane(items, kind) {
   return (Array.isArray(items) ? items : []).filter((item) => item.kind === kind);
 }
 
+export function focusTargetAfterQueueChange(lane, focused) {
+  const action = typeof focused?.action === "string" ? focused.action : "";
+  if (!action) return null;
+  const safeLane = Array.isArray(lane) ? lane : [];
+  if (focused?.itemId && safeLane.some((item) => item?.id === focused.itemId)) {
+    return { itemId: focused.itemId, action };
+  }
+  if (!safeLane.length) return null;
+  const index = Number.isInteger(focused?.index)
+    ? Math.min(Math.max(focused.index, 0), safeLane.length - 1)
+    : 0;
+  return { itemId: safeLane[index]?.id, action };
+}
+
 export function getNextItem(items, kind, currentItemId = null) {
   const lane = getLane(items, kind);
   if (!lane.length) return null;

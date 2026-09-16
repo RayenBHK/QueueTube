@@ -4,9 +4,9 @@ Updated: 2026-09-16. Read this first after a model switch, usage-limit interrupt
 
 ## Current stopping point
 
-The latest request authorized the single v0.3.3 keyboard-unlock fix proposed after the roadmap breakdown. Implemented locally: Space/K typed in inputs, textareas, or contenteditable elements no longer unlocks queued manual playback. Normal Space/K player use and pointer unlocking remain unchanged. No other roadmap fixes, release, tag, or creative asset were started. There are no active subtasks or delegated agents.
+The user authorized completing the full v0.3.3 roadmap and releasing it. Done: unavailable-video recovery, Queue Room focus preservation, automated 24-control audit, disabled-state/focus alignment, settings smoke, live-YouTube browser smoke, version 0.3.3, packaged ZIP, and release docs. Pending in this task: final `check-extension` re-run after the handoff edit, commit, push, tag, and GitHub release. There are no active subtasks or delegated agents.
 
-Regression evidence: the new editable-field test failed on Space in an input before the fix, then passed after the guard. Tests cover Space, lowercase/uppercase K, all three editable target types, untouched event propagation/defaults, and player unlocking even with QueueTube shortcuts disabled. Next verification: reload the extension, refresh YouTube, and manually check search/comment typing versus player Space/K. Browser smoke and companion-extension compatibility were not rerun.
+What shipped in 0.3.3: `PLAYER_UNAVAILABLE` detection in `src/content.js` plus a worker handler that moves a matching session to `error` with `lastError: video-unavailable` (queue/history untouched, retry via a new pick); `focusTargetAfterQueueChange` in `src/queue-core.js` with capture/restore glue in `src/sidepanel/sidepanel.js`; new `tests/player-recovery.test.js` (worker-level, 4 tests) and `tests/settings-audit.test.js` (all 24 keys round-trip plus invalid rejection); content-policy tests for error-overlay reporting and editable-field unlock; sidepanel disabled/focus-offset alignment. Store screenshot `screenshot-queued-badge-1280x800.png` was refreshed by the browser smoke and visually reviewed (signed-out search, QUEUED badge, no account details).
 
 QueueTube v0.3.2 and its collapsed-popup fix are implemented and merged. The next-release proposal is saved. OpenDesign is installed but its MCP connection is blocked by an application startup failure. The user has not yet confirmed whether its dashboard opens normally.
 
@@ -33,7 +33,7 @@ Details: [features](FEATURES.md), [architecture](../ARCHITECTURE.md), [changes](
 
 Workspace: `C:/Users/MateBook X Pro/Documents/Extension_Project` (PowerShell).
 Remote: [RayenBHK/QueueTube](https://github.com/RayenBHK/QueueTube), private when last checked.
-Branch: `main`, tracking `origin/main`. Worktree was clean before the keyboard-unlock fix. The user authorized committing and pushing `src/content.js`, `tests/content-policy.test.js`, and this checkpoint. Verify completion with `git status --short --branch` and `git log -1 --oneline`; this checkpoint does not assume its own commit or push succeeded.
+Branch: `main`, tracking `origin/main`. Fix `7b68915` is pushed. This task stages the 0.3.3 code, tests, screenshot, version bump, and docs in one release commit on `main`, pushes it, tags `v0.3.3`, and creates the GitHub release. Verify with `git status --short --branch`, `git log -1 --oneline`, `git tag --list v0.3.3`, and `gh release view v0.3.3`. No store-dashboard upload was performed.
 
 - [PR #4](https://github.com/RayenBHK/QueueTube/pull/4) was merged into `main` as `ac3073d` on 2026-09-16 with a merge commit; the remote branch `codex/v0.3.2-feature-controls` was deleted after merge.
 - `gh` is authenticated as `RayenBHK` with `repo` scope; CI passed on `54d8a44` before merge.
@@ -44,7 +44,9 @@ Keep local commits, pushed commits, merged PRs, and published releases distinct.
 
 ## Verification and how to resume testing
 
-For the local keyboard-unlock fix on 2026-09-16, `node tools/check-extension.mjs` passed all 31 automated tests and 62 release checks; `git diff --check` passed. Version remains 0.3.2 until release preparation. Previously, the merge-ready head `54d8a44` passed 29 automated tests and 62 release checks. The saved settings smoke report passes all 24 controls; browser smoke was not rerun for the documentation-only changes. Native popup measurements were 420×588 in both 1280×800 and 800×600 browser windows, with no horizontal overflow and the footer visible. CI passed on the branch before PR #4 merged.
+For v0.3.3 on 2026-09-16, `node tools/check-extension.mjs` passed all 40 automated tests and 62 release checks. `node tools/settings-smoke.mjs` passed all 24 controls with native 420×588 popup measurements in 1280×800 and 800×600 windows, no overflow, footer visible. `node tools/browser-smoke.mjs --port=9228` passed the full live-YouTube sequence (capture, Later, same-tab playback, natural completion, budgets, Focus Shield, 320px reflow, clean consoles) and refreshed the store screenshot. Previously, the merge-ready head `54d8a44` passed 29 automated tests and 62 release checks; CI passed on the branch before PR #4 merged.
+
+Environment notes: CFT remote debugging only binds when the browser is spawned from Node with `windowsHide: true, stdio: ignore`; PowerShell `Start-Process` launches never opened the DevTools port. The worker target sleeps when idle, so wake it with a YouTube page (or `--extension-id=`) before browser-smoke. Probe orphans were cleaned; no user browser was touched (none was running). The mass `Stop-Process -Name node/chrome` cleanup is a blunt tool; prefer command-line-matched kills next time.
 
 Evidence on this machine (ignored by Git and not guaranteed on another machine):
 
@@ -92,15 +94,14 @@ The installed runtime resolves its own Node/CLI paths and calls `codex mcp add o
 
 Local ignored evidence: `.artifacts/opendesign-mcp-install.stdout.log`, `.artifacts/opendesign-mcp-install.stderr.log`. The optional `.artifacts/check-opendesign-mcp.mjs` helper has passed a syntax check but has **not** verified a working connection. It initializes the configured bridge and lists tools without calling creative tools. A new task/client restart may be needed to expose newly registered tools.
 
-## Roadmap: one scoped fix implemented locally
+## Roadmap: 0.3.3 released, 0.4.0 proposed
 
-[ROADMAP-NEXT.md](ROADMAP-NEXT.md) remains the release proposal. Only the editable-field keyboard-unlock fix described above was implemented; the rest awaits scope selection:
+[ROADMAP-NEXT.md](ROADMAP-NEXT.md) records v0.3.3 as complete. Remaining user-side manual checks: Brave, display scaling, Unhook compatibility, personal install.
 
-- 0.3.3: reliability, Chrome/Brave/scaling checks, playback compatibility, all-control audit, recovery, keyboard/focus polish, documentation, and release checks.
 - 0.4.0: queue search, channel organization, named local queues, per-lane preferences, right-click capture, and file exports.
 - Undo removal, resume positions, and duration totals are additional proposals requiring approval. Bounded Shorts preloading, presets, backup reminders, and store submission are later options.
 
-Do not treat “continue” as permission to implement every proposed feature or produce creative assets. Resume the last authorized unfinished task, or ask which scope the user wants when none exists.
+Do not treat “continue” as permission to implement 0.4.0 or produce creative assets. Resume the last authorized unfinished task, or ask which scope the user wants when none exists.
 
 ## Agent operating notes
 

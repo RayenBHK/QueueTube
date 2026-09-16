@@ -11,7 +11,7 @@ Open the extension popup, then **Features & controls**. Search by feature or des
 | Load the next Short | On | After a Short ends, loads the next Short in Queue Room, following the start-paused preference. |
 | Load the next video | On | Equivalent sequencing for the long-video lane. |
 | Shorts in the main player | On | Uses regular watch pages instead of the Shorts interface. Applies when a pick next opens, including picks saved earlier. |
-| Player keyboard controls | On | Enables W (Done), N (Later), P (Previous), X (Skip), and ? (help) on queued player pages. Space/K remain YouTube's controls. |
+| Player keyboard controls | On | Enables W (Done), N (Later), P (Previous), X (Skip), and ? (help) on queued player pages. Space/K remain YouTube's controls. Typing in search boxes, comments, or other editable fields never counts as a player action and never unlocks a paused pick. |
 | Session time limit | 0 / off | A whole number from 1 to 180 starts an elapsed-time budget; 0 removes it. Saving restarts the current timer and remembers the default for the next browser session. Pauses count toward the limit. Queue Room budget buttons update the same preference. |
 
 **Background listening recipe:** turn **Pause when leaving a tab** off and leave **Start each pick paused** on. Start the pick yourself, then switch tabs. In Classic mode, also turn off **Sleep inactive video tabs** if you want long-video audio to continue.
@@ -65,7 +65,7 @@ These do not run automatically and therefore use buttons rather than switches:
 
 ## Updating and compatibility
 
-Reload QueueTube in `chrome://extensions`, then refresh existing YouTube tabs once. Existing queues and history remain. Old versions tied manual start to background pause: v0.3.2 initially copies that old value into both switches, then lets you change them independently. New preferences keep existing behavior by default. Backup schema remains 3.
+Reload QueueTube in `chrome://extensions`, then refresh existing YouTube tabs once. Existing queues and history remain. Old versions tied manual start to background pause: v0.3.2 initially copies that old value into both switches, then lets you change them independently. New preferences keep existing behavior by default. Backup schema remains 3. A private, deleted, or restricted video moves the session to Needs attention instead of stalling; press `X` to skip it or load another pick to continue.
 
 ## UI design notes
 

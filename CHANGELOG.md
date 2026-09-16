@@ -5,6 +5,25 @@
 
 This changelog records user-facing features, fixes, and compatibility changes for each QueueTube release.
 
+## 0.3.3: 2026-09-16
+
+### Added
+
+- Unavailable-video recovery: a private, deleted, or restricted pick moves the session to a recoverable Needs-attention state instead of stalling, with retry and skip paths preserved
+- Keyboard focus preservation across Queue Room re-renders, including reorder, removal, and background updates
+- Automated audit covering all 24 preferences through the worker settings path, including invalid-value rejection
+
+### Fixed
+
+- Typing Space or K into a search box, comment field, or other editable element no longer unlocks a paused queued pick; deliberate player use of Space and K is unchanged
+- Disabled Queue Room actions now share the popup's dimmed, non-interactive treatment, and keyboard focus outlines match across both views
+- Full browser smoke verified on live YouTube: capture, Later rotation, same-tab playback, natural completion, budgets, Focus Shield, 320px reflow, and clean extension consoles
+
+### Compatibility
+
+- No new permissions, network services, or analytics
+- Refresh existing YouTube tabs after reloading the extension to load the updated content script
+
 ## 0.3.2: 2026-09-15
 
 ### Added

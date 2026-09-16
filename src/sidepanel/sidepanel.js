@@ -1,3 +1,4 @@
+import { focusTargetAfterQueueChange } from "../queue-core.js";
 import { createSettingsUI, renderSettingsUI, settingPatch } from "../settings-ui.js";
 
 const featureSettings = document.getElementById("feature-settings");
@@ -252,7 +253,29 @@ function renderCommands() {
   elements.commandList.replaceChildren(fragment);
 }
 
+function captureQueueFocus() {
+  const button = document.activeElement?.closest?.("[data-action]");
+  const row = button?.closest?.(".queue-item");
+  if (!button || !row) return null;
+  return {
+    itemId: row.dataset.itemId,
+    kind: row.dataset.kind,
+    action: button.dataset.action,
+    index: Number(row.dataset.laneIndex)
+  };
+}
+
+function restoreQueueFocus(focused) {
+  if (!focused) return;
+  const target = focusTargetAfterQueueChange(laneItems(focused.kind), focused);
+  if (!target) return;
+  const row = document.querySelector(`.queue-item[data-item-id="${CSS.escape(target.itemId)}"]`);
+  const button = row?.querySelector(`[data-action="${target.action}"]`);
+  (button && !button.disabled ? button : row?.querySelector("[data-action]:not([disabled])"))?.focus();
+}
+
 function render() {
+  const focused = captureQueueFocus();
   renderLane("short", elements.shortList, elements.shortEmpty, elements.shortCount);
   renderLane("video", elements.videoList, elements.videoEmpty, elements.videoCount);
   renderHistory();
@@ -263,6 +286,7 @@ function render() {
   renderCommands();
   elements.totalCount.textContent = String((appState.items || []).length);
   byId("clear-queue").disabled = (appState.items || []).length === 0;
+  restoreQueueFocus(focused);
 }
 
 async function refresh({ commands = false } = {}) {

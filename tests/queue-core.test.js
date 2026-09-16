@@ -12,6 +12,7 @@ import {
   createSession,
   createQueueItem,
   deferQueueItem,
+  focusTargetAfterQueueChange,
   formatDuration,
   getNextItem,
   historyEntry,
@@ -113,6 +114,16 @@ test("gives allowed duplicate picks independent controls", () => {
   assert.equal(second.item.key, original.key);
   assert.equal(new URL(second.item.playbackUrl).searchParams.get("qt_item"), second.item.id);
   assert.equal(removeQueueItem(second.items, second.item.id).length, 1);
+});
+
+test("queue focus survives reordering and falls back to the nearest pick", () => {
+  const lane = [{ id: "a" }, { id: "b" }, { id: "c" }];
+  assert.deepEqual(focusTargetAfterQueueChange(lane, { itemId: "b", action: "remove", index: 1 }), { itemId: "b", action: "remove" });
+  assert.deepEqual(focusTargetAfterQueueChange([{ id: "a" }, { id: "c" }], { itemId: "b", action: "remove", index: 1 }), { itemId: "c", action: "remove" });
+  assert.deepEqual(focusTargetAfterQueueChange([{ id: "a" }], { itemId: "c", action: "up", index: 5 }), { itemId: "a", action: "up" });
+  assert.equal(focusTargetAfterQueueChange([], { itemId: "a", action: "remove", index: 0 }), null);
+  assert.equal(focusTargetAfterQueueChange(lane, null), null);
+  assert.equal(focusTargetAfterQueueChange(lane, { itemId: "a", index: 0 }), null);
 });
 
 test("moves a Later item to the end and selects the following item", () => {

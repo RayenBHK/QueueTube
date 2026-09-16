@@ -6,7 +6,7 @@ import { DEFAULT_SETTINGS } from "../src/queue-core.js";
 
 const source = await readFile(new URL("../src/content.js", import.meta.url), "utf8");
 
-async function player(patch = {}, queued = true) {
+async function player(patch = {}, queued = true, options = {}) {
   const events = new Map();
   const classes = new Set();
   const messages = [];
@@ -21,13 +21,18 @@ async function player(patch = {}, queued = true) {
   class Input extends Element {}
   class TextArea extends Element {}
   const media = new Media();
+  const errorOverlay = options.unavailable ? new Element() : null;
   const editableTargets = [new Input(), new TextArea(), Object.assign(new Element(), { isContentEditable: true })];
   const on = (name, fn) => events.set(name, [...(events.get(name) || []), fn]);
   const document = {
     hidden: false,
     documentElement: { classList: { toggle(name, enabled) { if (enabled) classes.add(name); else classes.delete(name); } } },
     addEventListener: on,
-    querySelector: (selector) => selector === "video" ? media : null,
+    querySelector: (selector) => {
+      if (selector === "video") return media;
+      if (errorOverlay && (selector === ".ytp-error" || selector === "#error-screen")) return errorOverlay;
+      return null;
+    },
     querySelectorAll: (selector) => selector === "video, audio" ? [media] : [],
     getElementById: () => null
   };
@@ -95,6 +100,19 @@ test("Space and K still unlock queued playback outside editable fields", async (
     page.play();
     assert.equal(page.media.paused, false);
   }
+});
+
+test("a player error overlay reports the pick as unavailable exactly once", async () => {
+  const page = await player({}, true, { unavailable: true });
+  const reports = page.messages.filter((message) => message.type === "PLAYER_UNAVAILABLE");
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].itemId, "video:abc");
+  assert.equal(reports[0].transitionToken, "one");
+});
+
+test("a healthy player never reports its pick as unavailable", async () => {
+  const page = await player();
+  assert.equal(page.messages.some((message) => message.type === "PLAYER_UNAVAILABLE"), false);
 });
 
 test("all four combinations of manual-start and background-pause are independent", async () => {

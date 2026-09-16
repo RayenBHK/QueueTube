@@ -72,6 +72,15 @@ Test playback with at least two Shorts and two long videos:
 
 Switch to another tab while media plays. Confirm QueueTube pauses the hidden YouTube media when **Manual play only** is enabled.
 
+## Verify manual-play unlock
+
+On a queued player page with **Start each pick paused** on:
+
+1. Confirm the pick stays paused when the page loads.
+2. Press Space, then K, on the player. Confirm playback starts; YouTube's Space/K controls still work.
+3. Load the next pick. Type Space or K into YouTube's search box or comment field. Confirm the pick stays paused and the text field receives the characters.
+4. Click the player. Confirm playback unlocks as with the keyboard.
+
 ## Verify time budgets
 
 Open the Queue Room and select **10m**, **20m**, **30m**, and a custom whole number from 1 to 180. Confirm the countdown updates each second.
@@ -156,6 +165,7 @@ For the live YouTube check, reload the extension and refresh previously open You
 8. Change the theme in the popup while Queue Room is open. Both should update. Close/reopen the popup and confirm settings persist.
 9. In Classic mode, verify Shorts-player conversion and sleeping controls. Disable sleeping as well as background pausing when testing background audio.
 10. Check a short session time limit, then set it to 0 from the popup to remove it.
+11. On a queued player page, type Space or K into the search box or comment field. Confirm the pick stays paused.
 
 Complete the remaining checks in [CHROMEWEBSTORE.md](../CHROMEWEBSTORE.md) before uploading the ZIP.
 

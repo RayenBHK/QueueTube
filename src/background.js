@@ -547,6 +547,25 @@ async function updatePlayerState(message, sender) {
   });
 }
 
+async function reportUnavailablePlayer(message, sender) {
+  return withPlayerLock(async () => {
+    const session = await getSession();
+    if (
+      sender.tab?.id !== session.playerTabId ||
+      message.itemId !== session.currentItemId ||
+      message.transitionToken !== session.transitionToken
+    ) {
+      return { ok: false, reason: "stale-player" };
+    }
+    if (session.status === PLAYBACK_STATES.ERROR) return { ok: true, session };
+    if (![PLAYBACK_STATES.LOADING, PLAYBACK_STATES.READY, PLAYBACK_STATES.PLAYING, PLAYBACK_STATES.ADVANCING].includes(session.status)) {
+      return { ok: false, reason: "not-playing" };
+    }
+    const nextSession = await setSessionState(PLAYBACK_STATES.ERROR, { lastError: "video-unavailable" });
+    return { ok: true, session: nextSession };
+  });
+}
+
 async function getPlayerPolicy(message, sender) {
   const session = await getSession();
   const current = sender.tab?.id === session.playerTabId &&
@@ -936,6 +955,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return respondAsync(sendResponse, () => handlePlayerEnded(message, sender));
     case "PLAYER_STATE":
       return respondAsync(sendResponse, () => updatePlayerState(message, sender));
+    case "PLAYER_UNAVAILABLE":
+      return respondAsync(sendResponse, () => reportUnavailablePlayer(message, sender));
     case "GET_PLAYER_POLICY":
       return respondAsync(sendResponse, () => getPlayerPolicy(message, sender));
     case "FOCUS_PLAYER":

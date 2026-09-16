@@ -28,6 +28,7 @@
   let transitionToken = null;
   let manualPlaybackUnlocked = false;
   let budgetToastShown = false;
+  let unavailableReported = false;
   let toastTimer = null;
   let badgeRefreshTimer = null;
   let observedVideo = null;
@@ -222,6 +223,23 @@
     if (!settings.showToasts) document.getElementById("queuetube-toast-root")?.remove();
   }
 
+  function playerErrorPresent() {
+    return Boolean(document.querySelector(".ytp-error") || document.querySelector("#error-screen"));
+  }
+
+  async function reportUnavailablePlayer() {
+    if (!queuedPageKey || !transitionToken || unavailableReported) return;
+    if (!playerErrorPresent()) return;
+    unavailableReported = true;
+    try {
+      const result = await chrome.runtime.sendMessage({ type: "PLAYER_UNAVAILABLE", itemId: queuedPageKey, transitionToken });
+      if (result?.ok) showToast("This video looks unavailable. Press X to skip it.", "error");
+      else unavailableReported = false;
+    } catch {
+      unavailableReported = false;
+    }
+  }
+
   function syncQueuePage() {
     const context = currentQueueContext();
     if (context.itemId !== queuedPageKey || context.transitionToken !== transitionToken) {
@@ -229,9 +247,11 @@
       transitionToken = context.transitionToken;
       manualPlaybackUnlocked = false;
       budgetToastShown = false;
+      unavailableReported = false;
     }
     applyFocusShield();
     enforcePlaybackPolicy();
+    void reportUnavailablePlayer();
     window.setTimeout(bindCurrentVideo, 250);
   }
 
@@ -434,6 +454,6 @@
   document.addEventListener("yt-navigate-finish", syncQueuePage, true);
   window.addEventListener("popstate", syncQueuePage, true);
   document.addEventListener("DOMContentLoaded", syncQueuePage, { once: true });
-  window.setInterval(() => void enforceBudgetPolicy(), 1000);
+  window.setInterval(() => { void enforceBudgetPolicy(); void reportUnavailablePlayer(); }, 1000);
   void initialize();
 })();

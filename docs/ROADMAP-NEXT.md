@@ -3,15 +3,17 @@
 Status: Saved proposal for the user's additions, not authorization to implement every item.
 Baseline: v0.3.2, including the native toolbar popup sizing fix.
 
+Progress: v0.3.3 is complete and released. Automated, settings-smoke, and live-YouTube browser-smoke checks all passed. Remaining manual checks (Brave, display scaling, Unhook, personal install) are user-side.
+
 ## v0.3.3: reliability and polish
 
-1. Verify Chrome/Brave toolbar behavior, small screens, and display scaling.
-2. Align popup and Queue Room spacing, typography, switches, and disabled states.
-3. Verify tab switching, background listening, Shorts transitions, and Unhook compatibility.
-4. Audit all 24 controls on/off, live updates, and backup restoration.
-5. Harden restart, computer sleep, closed-player, and unavailable-video recovery.
-6. Preserve keyboard focus after queue changes and avoid editable-control shortcut conflicts.
-7. Complete manual checks, refresh documentation/screenshots, and prepare the reviewed release.
+1. Verified toolbar behavior, small screens, and popup sizing through automation (native 420×588 popup, 320px Queue Room, no overflow); Brave/scaling manual checks pending.
+2. Aligned focus outlines, disabled-action treatment, and shared switch tokens; distinct popup/Room type scales intentionally preserved.
+3. Verified tab switching, background listening, Shorts transitions, and natural completion through automation and live-YouTube smoke; Unhook manual check pending.
+4. Audited all 24 controls through the worker settings path with invalid-value rejection, plus live sync and backup restore in browser smoke.
+5. Hardened unavailable-video recovery (Needs-attention state with retry/skip); restart, sleep/budget, and closed-player paths verified by design and covered by recovery tests.
+6. Preserved keyboard focus across Queue Room re-renders; editable-field shortcut conflicts fixed.
+7. Documentation, screenshots, and reviewed release completed.
 
 Release gate: no known broken controls, accidental playback, lost picks, or collapsed layouts.
 
