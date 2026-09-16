@@ -18,7 +18,10 @@ async function player(patch = {}, queued = true) {
     removeEventListener() {}
     pause() { this.paused = true; }
   }
+  class Input extends Element {}
+  class TextArea extends Element {}
   const media = new Media();
+  const editableTargets = [new Input(), new TextArea(), Object.assign(new Element(), { isContentEditable: true })];
   const on = (name, fn) => events.set(name, [...(events.get(name) || []), fn]);
   const document = {
     hidden: false,
@@ -35,14 +38,14 @@ async function player(patch = {}, queued = true) {
   };
   runInNewContext(source, {
     URL, document, window, chrome, Element, HTMLAnchorElement: class extends Element {},
-    HTMLInputElement: class extends Element {}, HTMLTextAreaElement: class extends Element {}, HTMLMediaElement: Media,
+    HTMLInputElement: Input, HTMLTextAreaElement: TextArea, HTMLMediaElement: Media,
     location: { href: queued ? "https://www.youtube.com/watch?v=abc&qt_queue=1&qt_item=video:abc&qt_transition=one" : "https://www.youtube.com/watch?v=abc", pathname: "/watch" },
     MutationObserver: class { observe() {} }, requestAnimationFrame: (fn) => fn()
   });
   await new Promise(setImmediate);
   const fire = (name, event = {}) => { for (const fn of events.get(name) || []) fn(event); };
   return {
-    media, document, classes, messages, fire,
+    media, document, classes, messages, fire, editableTargets,
     play() { media.paused = false; fire("play", { target: media }); },
     unlock() { fire("pointerdown", { composedPath: () => [media] }); },
     settings(patch) { settingsListener({ qtSettings: { newValue: { ...DEFAULT_SETTINGS, ...patch } } }, "local"); }
@@ -61,6 +64,37 @@ test("background listening does not unlock autoplay on a queued page", async () 
   assert.equal(page.media.paused, false);
   page.settings({ pauseBackground: true, manualPlay: true });
   assert.equal(page.media.paused, true);
+});
+
+test("typing Space or K in editable fields does not unlock queued playback", async () => {
+  for (const key of [" ", "k", "K"]) {
+    const page = await player({ manualPlay: true, pauseBackground: false });
+    for (const target of page.editableTargets) {
+      let prevented = false;
+      let stopped = false;
+      page.fire("keydown", {
+        key, target,
+        preventDefault() { prevented = true; },
+        stopPropagation() { stopped = true; }
+      });
+      page.play();
+      assert.equal(page.media.paused, true, `${JSON.stringify(key)} in ${target.constructor.name}`);
+      assert.equal(prevented, false);
+      assert.equal(stopped, false);
+      assert.equal(page.messages.length, 0);
+    }
+  }
+});
+
+test("Space and K still unlock queued playback outside editable fields", async () => {
+  for (const key of [" ", "k", "K"]) {
+    const page = await player({ manualPlay: true, playerShortcuts: false });
+    page.play();
+    assert.equal(page.media.paused, true);
+    page.fire("keydown", { key, target: page.media });
+    page.play();
+    assert.equal(page.media.paused, false);
+  }
 });
 
 test("all four combinations of manual-start and background-pause are independent", async () => {

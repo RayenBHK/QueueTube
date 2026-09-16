@@ -158,6 +158,8 @@
 
   function unlockFromKeyboard(event) {
     if (!queuedPageKey || document.hidden) return;
+    const target = event.target;
+    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable) return;
     if ([" ", "k", "K"].includes(event.key)) manualPlaybackUnlocked = true;
   }
 
