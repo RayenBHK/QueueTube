@@ -2,25 +2,48 @@
 
 ## Start here after a model switch or interruption
 
-Read `docs/HANDOFF.md` before project work. It is the current checkpoint, not an instruction to execute the entire roadmap. Follow the user's latest request, verify live state, and preserve unrelated changes.
+Read `docs/HANDOFF.md` first. It is the current checkpoint, not an instruction to execute the whole roadmap. Follow the user's latest request, verify live state, and preserve unrelated changes.
 
-## Keep the checkpoint current
+## Commands (Node.js 22+)
 
-- Update `docs/HANDOFF.md` after meaningful milestones and before handing work back, switching models, or approaching a usage limit. Do not rely on a final chat recap being available.
-- Record completed work, active work, exact next steps, blockers, decisions, verification evidence, and Git status. Label proposals and unverified claims explicitly.
-- Record any active agent's assignment and uncommitted files before a handoff. Do not assume agents, terminals, or browser sessions survive a switch.
-- Keep one current checkpoint, not a growing transcript. Link existing feature, architecture, testing, and roadmap documents instead of duplicating them.
-- Never store credentials, tokens, private queue contents, or full account/configuration dumps in documentation.
+- Full release check (manifest, PNGs, syntax, no dynamic code / no `.then(` chains, then `node --test`): `node tools/check-extension.mjs`
+- Unit suite only: `node --test` (or a single file, e.g. `node --test tests/queue-core.test.js`)
+- Package the store ZIP: `powershell -NoProfile -ExecutionPolicy Bypass -File tools/package-extension.ps1`
+- Settings smoke (needs Chrome for Testing under `.tools/chrome-win64/`; launches its own isolated profile): `node tools/settings-smoke.mjs`
+- Repeatable browser smoke (needs an isolated CFT profile with remote debugging): `node tools/browser-smoke.mjs --port=9228`
+
+`package.json` only exposes `test`, `check`, `package`; there is no lint/typecheck. CI runs `node tools/check-extension.mjs` only. Prefer `check-extension.mjs` over running the unit suite separately.
+
+## How the extension is wired
+
+- Manifest V3. `src/background.js` is the service worker (module). No framework, no runtime dependencies, no build step. `src/queue-core.js` holds shared pure logic and `DEFAULT_SETTINGS`.
+- `src/settings-ui.js` holds `FEATURE_GROUPS`, the single catalog of all user controls shared by popup and side panel. Every `DEFAULT_SETTINGS` key must appear exactly once there; a test enforces this. `src/content.js` keeps its own copy of default settings for the content-script context.
+- Persistent state: `chrome.storage.local` (queue, history, settings, schema 3). Session state: `chrome.storage.session` (playback state, player tab, budget).
+- Service-worker global scope must not hold mutable queue state; read current storage on every event.
+- Tests import `src/*.js` directly via `node:test`; there is no bundler or transpiler.
+
+## Constraints that are easy to violate
+
+- No comments in code unless asked. Write docs/prose in normal prose.
+- Do not add runtime dependencies, analytics, remote JavaScript, or `<all_urls>`. Host access stays limited to the three YouTube patterns.
+- Extension pages must use external JS only (no inline `<script>` or `on*=` handlers); `check-extension.mjs` fails otherwise.
+- `eval`, `new Function`, and `.then(` are banned by the release check — use `async`/`await`.
+- Preserve manual-play defaults (`manualPlay`, `pauseBackground`), separate Shorts/video lanes, and the user's existing stored data.
+- v0.3.1 shortcut fix: never `await` a lookup before `sidePanel.open()` from a command, or the user gesture is lost.
+- Native popup sizing relies on explicit `html` dimensions (420x588), not `body`/`100vw`. Do not reintroduce viewport-based sizing.
+- Keep `manifest.json` and `package.json` versions identical; the checker enforces it.
 
 ## Working preferences
 
-- Use Caveman full for concise conversation and Ponytail full for coding. Write documentation, code comments, and Git text in normal prose. Read applicable skills before using them.
-- Use RTK for supported shell commands; use native commands with focused output when RTK is unavailable or incompatible.
-- For setup, integration, and investigation with independent checks, use bounded `gpt-5.6-luna` subagents with `high` reasoning. Avoid delegation for trivial or strictly sequential work; the main agent owns integration and verification.
+- Caveman full for concise conversation, Ponytail full for coding. Read applicable skills before using them.
+- Prefer RTK for supported shell commands; fall back to native focused commands when it fails.
 - Use UI UX Pro Max for interface work and the Chrome extensions skill for extension work when available.
-- Prefer the user's installed OpenDesign, through its connected MCP when available, for requested product visuals, photographs, videos, animation, presentations, UI designs, and interactive 3D landing pages. Verify supported capabilities; do not silently substitute a service or claim a connection that does not exist.
-- The creative preference does not authorize generation now, paid services, account changes, uploads, or publishing. The next-release roadmap is a proposal until the user chooses work.
+- Use OpenDesign (installed; MCP connection currently blocked — see `docs/HANDOFF.md`) for requested visuals, and do not claim a connection that does not exist. No generation, paid services, uploads, or publishing without the user choosing that work.
+- Delegate only bounded, independent setup/integration/investigation work; the main agent owns integration and verification.
 
-## Project safeguards
+## Keep the checkpoint current
 
-Preserve local-first storage, separate Shorts/video lanes, manual playback defaults, and existing user data. Do not add analytics, remote executable code, or permissions without justification and appropriate authorization. Keep tests and documentation aligned with changes. Never reset a dirty worktree or assume a local commit is pushed or released.
+- Update `docs/HANDOFF.md` after milestones and before switching models or approaching a limit. Record completed/active work, next steps, blockers, decisions, verification evidence, and Git status; label proposals and unverified claims.
+- One current checkpoint, not a transcript. Link feature/architecture/testing/roadmap docs instead of duplicating them.
+- Never store credentials, tokens, private queue contents, or config dumps in docs.
+- Never reset a dirty worktree, and never assume a local commit is pushed, a PR is merged, or a ZIP is published.
