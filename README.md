@@ -107,7 +107,7 @@ Build the Chrome Web Store ZIP on Windows:
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/package-extension.ps1
 ```
 
-Read [the completed v0.3 roadmap](docs/ROADMAP-v0.3.md), [the test guide](docs/TESTING.md), [the architecture reference](ARCHITECTURE.md), [accessibility support](docs/ACCESSIBILITY.md), and [the contribution guide](CONTRIBUTING.md).
+Read [the proposed v0.3.3/v0.4.0 roadmap](docs/ROADMAP-NEXT.md), [the completed v0.3 roadmap](docs/ROADMAP-v0.3.md), [the test guide](docs/TESTING.md), [the architecture reference](ARCHITECTURE.md), [accessibility support](docs/ACCESSIBILITY.md), and [the contribution guide](CONTRIBUTING.md).
 
 ## Privacy and support
 
