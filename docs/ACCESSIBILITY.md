@@ -32,10 +32,12 @@ QueueTube player shortcuts are documented in the [README](../README.md#collect-a
 - Shorts and videos use labels, borders, and lane names in addition to orange and blue.
 - The interface respects `prefers-reduced-motion` and removes nonessential transitions.
 - Text and control colors were reviewed against the WCAG 2.1 AA contrast thresholds, with forced-colors fallbacks for lane and state indicators.
-- The 320-pixel layout reflows without horizontal scrolling; Compact density reduces row height without removing named controls.
+- The Queue Room reflows at 320 pixels without horizontal scrolling. The toolbar popup requests a readable 420-pixel width; Compact density reduces spacing without removing named controls.
 
 ## Release verification
 
 The manual keyboard and assistive-state checks live in [docs/TESTING.md](TESTING.md#verify-keyboard-and-screen-reader-access). QueueTube 0.3.0 was exercised in an isolated Chrome for Testing 151 profile at 1280×800 and 430×800 viewports. The browser smoke test also checks visible control names, tab state, live regions, and horizontal overflow.
+
+For v0.3.2, `tools/settings-smoke.mjs` checks all 24 controls have visible labels and associated help, popup tab-key navigation, live preference updates, persistence, light/dark themes, and 320-pixel Queue Room reflow. It also opens the actual toolbar popup in 1280×800 and 800×600 browser windows, without emulating its dimensions, and checks its width, footer visibility, content scrolling, and horizontal overflow. Native popup screenshots were visually inspected at 420×588. Earlier tab-only previews missed the auto-sizing bug; the native checks now cover that path. These checks do not replace testing with an actual screen reader or the user's other YouTube extensions.
 
 Report an accessibility defect through [GitHub Issues](https://github.com/RayenBHK/QueueTube/issues). Include the Chrome version, operating system, input method, and assistive technology when applicable.

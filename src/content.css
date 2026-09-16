@@ -1,14 +1,14 @@
-.queuetube-focus-shield #secondary,
-.queuetube-focus-shield ytd-watch-next-secondary-results-renderer,
-.queuetube-focus-shield ytd-comments,
-.queuetube-focus-shield #comments,
-.queuetube-focus-shield .ytp-endscreen-content,
-.queuetube-focus-shield .ytp-ce-element,
-.queuetube-focus-shield ytd-merch-shelf-renderer {
+.queuetube-focus-shield.queuetube-hideRelated #secondary,
+.queuetube-focus-shield.queuetube-hideRelated ytd-watch-next-secondary-results-renderer,
+.queuetube-focus-shield.queuetube-hideComments ytd-comments,
+.queuetube-focus-shield.queuetube-hideComments #comments,
+.queuetube-focus-shield.queuetube-hideEndCards .ytp-endscreen-content,
+.queuetube-focus-shield.queuetube-hideEndCards .ytp-ce-element,
+.queuetube-focus-shield.queuetube-hideMerch ytd-merch-shelf-renderer {
   display: none !important;
 }
 
-.queuetube-focus-shield ytd-watch-flexy[flexy] #primary.ytd-watch-flexy {
+.queuetube-focus-shield.queuetube-hideRelated ytd-watch-flexy[flexy] #primary.ytd-watch-flexy {
   max-width: 1120px !important;
 }
 

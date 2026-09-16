@@ -136,7 +136,26 @@ Create the release ZIP:
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/package-extension.ps1
 ```
 
-Open `dist/queuetube-v0.3.1.zip`. It must contain only `manifest.json`, `assets/`, and `src/`. It must not contain repository metadata, tests, documentation, store assets, or environment files.
+Open `dist/queuetube-v0.3.2.zip`. It must contain only `manifest.json`, `assets/`, and `src/`. It must not contain repository metadata, tests, documentation, store assets, or environment files.
+
+## Verify v0.3.2 feature controls
+
+Run `node tools/settings-smoke.mjs` with Chrome for Testing installed under `.tools/chrome-win64/`. It launches its own fresh headless profile, verifies ownership before changing test data, and closes that browser afterward. It checks catalog coverage, persistence, live synchronization, search, keyboard navigation, themes, and 320px Queue Room reflow. It then uses `chrome.action.openPopup()` to check native toolbar sizing in 1280×800 and 800×600 windows, footer visibility, scrolling to the remaining features, and absence of horizontal overflow. These native checks must not apply a viewport override: a normal tab with forced dimensions cannot catch toolbar auto-sizing failures. Screenshots and a report are saved under `.artifacts/`.
+
+Manually click the toolbar icon after reloading the extension. Confirm the popup is about 420 pixels wide, both lanes are visible, labels do not collapse into narrow columns, and Features & controls scrolls without horizontal scrolling. Test in a smaller window and with your usual display scaling. Changing Compact layout must not shrink the outer popup width.
+
+For the live YouTube check, reload the extension and refresh previously open YouTube tabs once:
+
+1. Keep **Start each pick paused** on. Turn **Pause when leaving a tab** off in the popup.
+2. Open a queued pick: it must still start paused. Start playback yourself, then switch to another tab. Audio should continue.
+3. Turn background pausing on, start playback, then switch tabs again. It should pause; returning must not automatically resume it.
+4. Turn both controls off and open another pick. QueueTube must allow playback; Chrome or YouTube may still require a play click.
+5. Toggle each Focus Shield component and confirm only its targeted content changes. Check without Unhook if another extension also hides it.
+6. Turn off player keyboard controls: W/N/P/X/? must stop invoking QueueTube actions; Space/K must still work.
+7. Turn off history recording, finish a pick, and confirm no new history appears. Existing records must remain.
+8. Change the theme in the popup while Queue Room is open. Both should update. Close/reopen the popup and confirm settings persist.
+9. In Classic mode, verify Shorts-player conversion and sleeping controls. Disable sleeping as well as background pausing when testing background audio.
+10. Check a short session time limit, then set it to 0 from the popup to remove it.
 
 Complete the remaining checks in [CHROMEWEBSTORE.md](../CHROMEWEBSTORE.md) before uploading the ZIP.
 

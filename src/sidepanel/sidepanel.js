@@ -1,3 +1,7 @@
+import { createSettingsUI, renderSettingsUI, settingPatch } from "../settings-ui.js";
+
+const featureSettings = document.getElementById("feature-settings");
+createSettingsUI(featureSettings);
 const IS_EXTENSION = Boolean(globalThis.chrome?.runtime?.id);
 const byId = (id) => document.getElementById(id);
 const elements = {
@@ -87,7 +91,7 @@ function renderBudget() {
 
 function readableState(value) {
   const labels = {
-    idle: "Idle", loading: "Loading", ready: "Ready · paused", playing: "Playing", advancing: "Advancing",
+    idle: "Idle", loading: "Loading", ready: "Ready", playing: "Playing", advancing: "Advancing",
     "lane-complete": "Lane complete", "budget-complete": "Time is up", error: "Needs attention"
   };
   return labels[value] || "Idle";
@@ -220,9 +224,7 @@ function renderHistory() {
 }
 
 function renderSettings() {
-  elements.captureMode.value = appState.settings.captureMode;
-  elements.theme.value = appState.settings.theme || "system";
-  settingInputs.forEach((input) => { input.checked = Boolean(appState.settings[input.dataset.setting]); });
+  renderSettingsUI(featureSettings, appState.settings);
   document.body.classList.toggle("compact", Boolean(appState.settings.compactDensity));
   applyTheme(appState.settings.theme);
 }
@@ -320,7 +322,7 @@ async function handleQueueAction(event) {
   const { itemId } = row.dataset;
   const laneIndex = Number(row.dataset.laneIndex);
   const action = actionButton.dataset.action;
-  if (action === "play") await runPlayerAction("OPEN_ITEM", "Loaded in the player. Press play when ready.", { itemId });
+  if (action === "play") await runPlayerAction("OPEN_ITEM", "Loaded in the player using your playback preferences.", { itemId });
   if (action === "remove") {
     await send({ type: "REMOVE_ITEM", itemId });
     await refresh();
@@ -370,7 +372,7 @@ document.addEventListener("dragend", () => { draggedItemId = null; clearDropStyl
 
 elements.shortList.addEventListener("click", (event) => void handleQueueAction(event));
 elements.videoList.addEventListener("click", (event) => void handleQueueAction(event));
-laneButtons.forEach((button) => button.addEventListener("click", () => void runPlayerAction("OPEN_NEXT", "Player ready. Playback stays manual.", { kind: button.dataset.openLane })));
+laneButtons.forEach((button) => button.addEventListener("click", () => void runPlayerAction("OPEN_NEXT", "Player ready. Your playback preferences apply.", { kind: button.dataset.openLane })));
 
 budgetButtons.forEach((button) => button.addEventListener("click", async () => {
   await send({ type: "SET_BUDGET", minutes: Number(button.dataset.budget) });
@@ -388,21 +390,12 @@ byId("custom-budget-form").addEventListener("submit", async (event) => {
 });
 
 settingInputs.forEach((input) => input.addEventListener("change", async () => {
-  await send({ type: "UPDATE_SETTINGS", patch: { [input.dataset.setting]: input.checked } });
+  if (!input.checkValidity()) { input.reportValidity(); return; }
+  input.disabled = true;
+  const result = await send({ type: "UPDATE_SETTINGS", patch: settingPatch(input) });
   await refresh();
-  setStatus("Setting saved.");
+  setStatus(result?.ok ? "Setting saved." : "Couldn’t save this preference. Try again.");
 }));
-elements.captureMode.addEventListener("change", async () => {
-  await send({ type: "UPDATE_SETTINGS", patch: { captureMode: elements.captureMode.value } });
-  await refresh();
-  setStatus(elements.captureMode.value === "queue-room" ? "Queue Room will save picks without tabs." : "Classic mode will open grouped tabs.");
-});
-elements.theme.addEventListener("change", async () => {
-  applyTheme(elements.theme.value);
-  await send({ type: "UPDATE_SETTINGS", patch: { theme: elements.theme.value } });
-  await refresh();
-  setStatus(`${elements.theme.selectedOptions[0].textContent} theme saved.`);
-});
 
 elements.queueTab.addEventListener("click", () => switchView("queue"));
 elements.historyTab.addEventListener("click", () => switchView("history"));
@@ -413,11 +406,11 @@ elements.historyTab.addEventListener("click", () => switchView("history"));
 }));
 
 byId("focus-player").addEventListener("click", () => void runPlayerAction("FOCUS_PLAYER", "Player focused."));
-byId("previous-item").addEventListener("click", () => void runPlayerAction("PREVIOUS_ITEM", "Previous pick restored and loaded paused."));
-byId("finish-current").addEventListener("click", () => void runPlayerAction("FINISH_CURRENT", "Marked done. Next pick loaded paused.", { outcome: "watched" }));
-byId("defer-current").addEventListener("click", () => void runPlayerAction("DEFER_CURRENT", "Moved to Later. Next pick loaded paused."));
-byId("skip-current").addEventListener("click", () => void runPlayerAction("SKIP_CURRENT", "Skipped. Next pick loaded paused."));
-byId("handoff-action").addEventListener("click", (event) => void runPlayerAction("OPEN_NEXT", "Next lane loaded paused.", { kind: event.currentTarget.dataset.kind }));
+byId("previous-item").addEventListener("click", () => void runPlayerAction("PREVIOUS_ITEM", "Previous pick restored."));
+byId("finish-current").addEventListener("click", () => void runPlayerAction("FINISH_CURRENT", "Marked done.", { outcome: "watched" }));
+byId("defer-current").addEventListener("click", () => void runPlayerAction("DEFER_CURRENT", "Moved to Later."));
+byId("skip-current").addEventListener("click", () => void runPlayerAction("SKIP_CURRENT", "Skipped."));
+byId("handoff-action").addEventListener("click", (event) => void runPlayerAction("OPEN_NEXT", "Next lane loaded.", { kind: event.currentTarget.dataset.kind }));
 
 byId("toggle-select").addEventListener("click", () => { selecting = true; render(); document.querySelector("[data-select-item]")?.focus(); });
 byId("cancel-select").addEventListener("click", () => { selecting = false; selectedItems.clear(); render(); byId("toggle-select").focus(); });

@@ -51,10 +51,19 @@ export const DEFAULT_SETTINGS = Object.freeze({
   captureMiddleClick: true,
   shortsInPlayer: true,
   pauseBackground: true,
+  manualPlay: true,
   sleepVideos: true,
   preventDuplicates: true,
   focusShield: true,
+  hideRelated: true,
+  hideComments: true,
+  hideEndCards: true,
+  hideMerch: true,
   showQueuedBadges: true,
+  showToasts: true,
+  showCountBadge: true,
+  playerShortcuts: true,
+  recordHistory: true,
   autoAdvanceShorts: true,
   autoAdvanceVideos: true,
   removeFinished: true,
@@ -200,16 +209,16 @@ export function queueKey(rawUrl) {
   return classified ? `${classified.kind}:${classified.videoId}` : null;
 }
 
-export function normalizeQueueUrl(rawUrl, { shortsInPlayer = true } = {}) {
+export function normalizeQueueUrl(rawUrl, { shortsInPlayer = true, manualPlay = true } = {}) {
   const classified = classifyYouTubeUrl(rawUrl);
   if (!classified) return null;
 
   const { kind, videoId } = classified;
   let url;
 
-  if (kind === QUEUE_KINDS.SHORT && shortsInPlayer) {
-    url = new URL("https://www.youtube.com/watch");
-    url.searchParams.set("v", videoId);
+  if (kind === QUEUE_KINDS.SHORT) {
+    url = new URL(shortsInPlayer ? "https://www.youtube.com/watch" : `https://www.youtube.com/shorts/${encodeURIComponent(videoId)}`);
+    if (shortsInPlayer) url.searchParams.set("v", videoId);
   } else if (classified.url.hostname.toLowerCase() === "youtu.be") {
     url = new URL("https://www.youtube.com/watch");
     url.searchParams.set("v", videoId);
@@ -221,7 +230,7 @@ export function normalizeQueueUrl(rawUrl, { shortsInPlayer = true } = {}) {
   }
 
   ["list", "index", "start_radio"].forEach((param) => url.searchParams.delete(param));
-  url.searchParams.set("autoplay", "0");
+  url.searchParams.set("autoplay", manualPlay ? "0" : "1");
   url.searchParams.set("qt_queue", "1");
   url.searchParams.set("qt_kind", kind);
 
@@ -392,6 +401,10 @@ export function sanitizeSettings(rawSettings = {}) {
   for (const [key, defaultValue] of Object.entries(DEFAULT_SETTINGS)) {
     const value = raw[key];
     if (typeof defaultValue === "boolean" && typeof value === "boolean") next[key] = value;
+  }
+  // Before v0.3.2, one switch controlled both manual start and hidden-tab pausing.
+  if (typeof raw.manualPlay !== "boolean" && typeof raw.pauseBackground === "boolean") {
+    next.manualPlay = raw.pauseBackground;
   }
   if (Object.values(CAPTURE_MODES).includes(raw.captureMode)) next.captureMode = raw.captureMode;
   if (Object.values(THEMES).includes(raw.theme)) next.theme = raw.theme;

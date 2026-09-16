@@ -76,9 +76,11 @@ async function setSettings(patch) {
       return typeof value === typeof DEFAULT_SETTINGS[key];
     })
   );
-  const next = sanitizeSettings({ ...(await getSettings()), ...safePatch });
-  await chrome.storage.local.set({ [STORAGE_KEYS.SETTINGS]: next });
-  return next;
+  return navigator.locks.request("queuetube:settings-write", async () => {
+    const next = sanitizeSettings({ ...(await getSettings()), ...safePatch });
+    await chrome.storage.local.set({ [STORAGE_KEYS.SETTINGS]: next });
+    return next;
+  });
 }
 
 async function getItems() {
@@ -96,8 +98,8 @@ async function getHistory() {
 }
 
 async function getSession() {
-  const stored = await chrome.storage.session.get({ [SESSION_KEY]: DEFAULT_SESSION });
-  return createSession(stored[SESSION_KEY]);
+  const stored = await chrome.storage.session.get(SESSION_KEY);
+  return createSession(stored[SESSION_KEY] || { budgetMinutes: (await getSettings()).defaultBudgetMinutes });
 }
 
 async function setSession(patch) {
@@ -298,8 +300,10 @@ function nextTransitionToken() {
   return crypto.randomUUID();
 }
 
-function playbackUrlFor(item, transitionToken) {
-  const url = new URL(item.playbackUrl);
+function playbackUrlFor(item, transitionToken, settings) {
+  const normalized = normalizeQueueUrl(item.sourceUrl || item.playbackUrl, settings);
+  const url = new URL(normalized?.url || item.playbackUrl);
+  url.searchParams.set("autoplay", settings.manualPlay ? "0" : "1");
   url.searchParams.set("qt_item", item.id);
   url.searchParams.set("qt_transition", transitionToken);
   return url.href;
@@ -321,13 +325,14 @@ async function openPlaybackItemUnlocked(item, preferredWindowId) {
     completedLane: null,
     sessionId,
     transitionToken,
+    startedAt: session.startedAt || (session.budgetMinutes ? Date.now() : null),
     lastError: null
   });
 
   try {
     const windowId = await getTargetWindowId(preferredWindowId);
     const playerTab = await validPlayerTab(session);
-    const url = playbackUrlFor(item, transitionToken);
+    const url = playbackUrlFor(item, transitionToken, await getSettings());
     let tab;
     if (playerTab) {
       tab = await chrome.tabs.update(playerTab.id, { url, active: true });
@@ -396,7 +401,7 @@ async function recordOutcome(itemId, outcome, sessionId = null) {
 
     const baseEntry = historyEntry(item, outcome);
     const entry = baseEntry ? { ...baseEntry, sessionId } : null;
-    const nextHistory = entry ? [entry, ...history].slice(0, HISTORY_LIMIT) : history;
+    const nextHistory = entry && settings.recordHistory ? [entry, ...history].slice(0, HISTORY_LIMIT) : history;
     const nextItems = settings.removeFinished ? removeQueueItem(items, itemId) : items;
     await Promise.all([
       setItems(nextItems),
@@ -649,6 +654,7 @@ async function setBudget(minutes) {
     return { ok: false, reason: "invalid-budget" };
   }
   const budgetMinutes = numericMinutes;
+  await setSettings({ defaultBudgetMinutes: budgetMinutes });
   const current = await getSession();
   const status = current.status === PLAYBACK_STATES.BUDGET_COMPLETE
     ? (current.currentItemId ? PLAYBACK_STATES.READY : PLAYBACK_STATES.IDLE)
@@ -833,7 +839,7 @@ async function updateBadge() {
       count = state.short.count + state.video.count;
       shortCount = state.short.count;
     }
-    await chrome.action.setBadgeText({ text: count ? String(count) : "" });
+    await chrome.action.setBadgeText({ text: settings.showCountBadge && count ? String(count) : "" });
     await chrome.action.setBadgeBackgroundColor({ color: shortCount ? "#F26B3A" : "#3B5CCC" });
     await chrome.action.setTitle({ title: count ? `QueueTube · ${count} queued` : "QueueTube · queue clear" });
   } catch (error) {
@@ -957,6 +963,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case "UPDATE_SETTINGS":
       return respondAsync(sendResponse, async () => {
         const settings = await setSettings(message.patch);
+        if (Object.hasOwn(message.patch || {}, "defaultBudgetMinutes") && Number.isInteger(message.patch.defaultBudgetMinutes) && message.patch.defaultBudgetMinutes >= 0 && message.patch.defaultBudgetMinutes <= 180) {
+          await setBudget(settings.defaultBudgetMinutes);
+        }
         await updateBadge();
         return { ok: true, settings };
       });
