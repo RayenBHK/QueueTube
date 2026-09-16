@@ -4,9 +4,9 @@ Updated: 2026-09-16. Read this first after a model switch, usage-limit interrupt
 
 ## Current stopping point
 
-The latest request is to preserve a reliable handoff for future agents. This checkpoint and the root `AGENTS.md` provide that continuity. No new release or creative asset is currently authorized. There are no active implementation subtasks to resume.
+The latest completed request was to push, merge, and handle the Git/GitHub side. PR #4 is merged into `main`, the feature branch is deleted remotely, and the handoff/agent-instruction docs are pushed. No new release, tag, or creative asset is authorized. There are no active implementation subtasks to resume.
 
-QueueTube v0.3.2 and its collapsed-popup fix are implemented. The next-release proposal is saved. OpenDesign is installed but its MCP connection is blocked by an application startup failure. The user has not yet confirmed whether its dashboard opens normally.
+QueueTube v0.3.2 and its collapsed-popup fix are implemented and merged. The next-release proposal is saved. OpenDesign is installed but its MCP connection is blocked by an application startup failure. The user has not yet confirmed whether its dashboard opens normally.
 
 ## Product intent and decisions
 
@@ -31,20 +31,18 @@ Details: [features](FEATURES.md), [architecture](../ARCHITECTURE.md), [changes](
 
 Workspace: `C:/Users/MateBook X Pro/Documents/Extension_Project` (PowerShell).
 Remote: [RayenBHK/QueueTube](https://github.com/RayenBHK/QueueTube), private when last checked.
-Branch: `codex/v0.3.2-feature-controls`.
+Branch: `main`, tracking `origin/main`.
 
-- `68ddf63`: v0.3.2 feature controls and polished popup; pushed.
-- `d9fb09f`: native toolbar autosizing fix; pushed.
-- `17dd380`: next-release roadmap; local, not pushed at the start of this handoff update.
-- [PR #4](https://github.com/RayenBHK/QueueTube/pull/4) was last verified open, not merged. Its remote status was not rechecked for this documentation-only task.
-- The working tree was clean and one commit ahead before this handoff update. This update adds the agent instructions/checkpoint and README link. Use `git status --short --branch` and `git log -5 --oneline` for its final commit and current ahead count; this file cannot name its own commit.
-- Local package: `dist/queuetube-v0.3.2.zip`, 52,894 bytes, previously checked to contain 19 allowed entries. It is not evidence of publication.
+- [PR #4](https://github.com/RayenBHK/QueueTube/pull/4) was merged into `main` as `ac3073d` on 2026-09-16 with a merge commit; the remote branch `codex/v0.3.2-feature-controls` was deleted after merge.
+- `gh` is authenticated as `RayenBHK` with `repo` scope; CI passed on `54d8a44` before merge.
+- `main` was checked out locally and fast-forwarded to the merge commit.
+- The local store package `dist/queuetube-v0.3.2.zip` (52,894 bytes) still reflects v0.3.2 and is not evidence of publication. No Git tag exists for v0.3.2.
 
-Keep local commits, pushed commits, merged PRs, and published releases distinct. Do not reset user changes or publish/merge as an implied handoff step.
+Keep local commits, pushed commits, merged PRs, and published releases distinct. Do not reset user changes or publish/tag as an implied step.
 
 ## Verification and how to resume testing
 
-The release check was rerun for this handoff on 2026-09-16: all 29 automated tests and 62 release checks passed. The earlier saved settings smoke report passes all 24 controls; browser smoke was not rerun for this documentation-only change. Its native popup measurements were 420×588 in both 1280×800 and 800×600 browser windows, with no horizontal overflow and the footer visible.
+`node tools/check-extension.mjs` passed on 2026-09-16 on the merge-ready head `54d8a44`: 29 automated tests and 62 release checks. The saved settings smoke report passes all 24 controls; browser smoke was not rerun for the documentation-only changes. Native popup measurements were 420×588 in both 1280×800 and 800×600 browser windows, with no horizontal overflow and the footer visible. CI passed on the branch before PR #4 merged.
 
 Evidence on this machine (ignored by Git and not guaranteed on another machine):
 
